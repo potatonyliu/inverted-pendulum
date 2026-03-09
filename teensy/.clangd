@@ -1,0 +1,8 @@
+CompileFlags:
+  Add: 
+    - "-isystem"
+    - "/Users/tonyliu/.platformio/packages/toolchain-gccarmnoneeabi/arm-none-eabi/include"
+    - "-isystem"
+    - "/Users/tonyliu/.platformio/packages/toolchain-gccarmnoneeabi/lib/gcc/arm-none-eabi/10.3.1/include" # Adjust version number if needed
+    - "-D__GNUC__"
+    - "-D__ARM_EABI__"

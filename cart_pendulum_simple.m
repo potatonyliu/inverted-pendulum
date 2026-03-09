@@ -25,11 +25,11 @@ figure;
 subplot(2,1,1); hold on;
 subplot(2,1,2); hold on;
 
-for angle = 0.1:0.1:0.9
+for angle = 0.01:0.01:0.3
     t = 10;
     z0 = [0, 0, angle, 0];
     
-    M = 1.0;
+    M = 3.0;
     m = 0.2;
     r = 1.0;
     g = 9.81;
@@ -37,10 +37,10 @@ for angle = 0.1:0.1:0.9
     A = [0 1 0 0; 0 0 g*m/M 0; 0 0 0 1; 0 0 (M+m)*g/(r*M) 0];
     B = [0; 1/M; 0; 1/(r*M)];
     Q = diag([10,1,10,1]);
-    R = 1;
+    R = 10;
     
     K = lqr(A, B, Q, R);
-    
+    K
     P = [M, m, r, g];
     
     tspan = [0 7];
