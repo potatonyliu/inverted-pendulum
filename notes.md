@@ -2,7 +2,11 @@
 
 # Symbolic Conventions
 
-$$ \begin{align*} g&\approx 9.81 m/s^2\\ m&=\text{mass of the pendulum (bob)}\\ M&=\text{mass of the cart}\\ r&=\text{length of the pendulum}\\ t&=\text{time}\\ x_p&=\text{x-cordinate of the pendulum}\\ y_p&=\text{y-cordinate of the pendulum}\\ F&= \text{force applied on the cart, only x-component} \\\theta&=\text{radian of the pendulum from positive x axis, function of t}\\ \phi&=\text{radian of the pendulum from positive y-axis, function of t}\\ x&=\text{position of the cart, function of t}\\ \dot \theta / \dot \phi&=\text{angular velocity of the pendulum, first derivative of } \theta / \phi\\ \dot x&=\text{velocity of the cart, first derivative of }x\\ \ddot \theta / \ddot \phi&=\text{angular accerlation of the pendulum, second derivative of } \theta / \phi\\ \ddot x&=\text{accerlation of the cart, second derivative of }x\\ T&=\text{Kinetic energy}\\ V&=\text{Potential energy} \end{align*} $$
+$$ \begin{align*} g&\approx 9.81 m/s^2\\ m&=\text{mass of the pendulum (bob)}\\ M&=\text{mass of the cart}\\ r&=\text{length of the pendulum}\\ t&=\text{time}\\ x_p&=\text{x-cordinate of the pendulum}\\ y_p&=\text{y-cordinate of the pendulum}\\ F&= \text{force applied on the cart, only x-component} \\
+
+\theta&=\text{radian of the pendulum from positive x axis, function of t}\\ \phi&=\text{radian of the pendulum from positive y-axis, function of t}\\ x&=\text{position of the cart, function of t}\\ \dot \theta / \dot \phi&=\text{angular velocity of the pendulum, first derivative of } \theta / \phi\\ \dot x&=\text{velocity of the cart, first derivative of }x\\ \ddot \theta / \ddot \phi&=\text{angular accerlation of the pendulum, second derivative of } \theta / \phi\\ \ddot x&=\text{accerlation of the cart, second derivative of }x\\ T&=\text{Kinetic energy}\\ V&=\text{Potential energy} \end{align*} $$
+
+
 
 *”mg” should be “-mg”
 
@@ -10,13 +14,19 @@ $$ \begin{align*} g&\approx 9.81 m/s^2\\ m&=\text{mass of the pendulum (bob)}\\ 
 
 ## LQR Parameters
 
-$$ \begin{bmatrix} x\\ \dot x\\ \phi\\ \dot \phi\\ \end{bmatrix}\begin{bmatrix} z_1\\ z_2\\ z_3\\ z_4\\ \end{bmatrix}$$
+# $$ \begin{bmatrix} x\\ \dot x\\ \phi\\ \dot \phi\\ \end{bmatrix}
+
+\begin{bmatrix} z_1\\ z_2\\ z_3\\ z_4\\ \end{bmatrix}
+
+$$
 
 where:
 
 $$ \begin{align*} \dot z_1 &= z_2\\ \dot z_2 &= \frac{gm\phi+F}{M}\\ \dot z_3 &= z_4\\ \dot z_4 &= \frac{F+(M+m)g\phi}{rM} \end{align*} $$
 
-$$ \begin{align} A&=\begin{bmatrix} 0 & 1 & 0 & 0\\ 0 & 0 & \frac{gm}{M} & 0\\ 0 & 0 & 0 & 1\\ 0 & 0 & \frac{(M+m)g}{rM} & 0\\ \end{bmatrix} \\ B&=\begin{bmatrix} 0\\ \frac{1}{M}\\ 0\\ \frac{1}{rM}\\ \end{bmatrix} \\ Q &= \text{diag}(10,1,10,1) \\R &=1 \end{align} $$
+$$ \begin{align} A&=\begin{bmatrix} 0 & 1 & 0 & 0\\ 0 & 0 & \frac{gm}{M} & 0\\ 0 & 0 & 0 & 1\\ 0 & 0 & \frac{(M+m)g}{rM} & 0\\ \end{bmatrix} \\ B&=\begin{bmatrix} 0\\ \frac{1}{M}\\ 0\\ \frac{1}{rM}\\ \end{bmatrix} \\ Q &= \text{diag}(10,1,10,1) \\
+
+R &=1 \end{align} $$
 
 $$ K=lqr(A,B,Q,R) $$
 
@@ -73,15 +83,27 @@ $$ L=T-V=\frac{m}{2}(\dot x ^2-2\dot xr \sin (\theta)\dot\theta + r^2\dot \theta
 
 Plug the Lagrangian into both equations in (1) to obtain the 2 key second order differential equations:
 
-$$\begin{cases} F=(M+m)\ddot x - mr\cos(\theta)\dot \theta^2 - mr\sin(\theta)\ddot \theta\\ \ddot x\sin(\theta)-r\ddot \theta = g\cos(\theta) \end{cases}$$
+$$
 
-$$\ddot x = \frac{F + mr\cos(\theta)\dot \theta^2 + mr\sin(\theta)\ddot \theta}{M+m}=\frac{g\cos(\theta)+r\ddot \theta}{\sin (\theta)}$$
+\begin{cases} F=(M+m)\ddot x - mr\cos(\theta)\dot \theta^2 - mr\sin(\theta)\ddot \theta\\ \ddot x\sin(\theta)-r\ddot \theta = g\cos(\theta) \end{cases}
+
+$$
+
+$$
+
+\ddot x = \frac{F + mr\cos(\theta)\dot \theta^2 + mr\sin(\theta)\ddot \theta}{M+m}=\frac{g\cos(\theta)+r\ddot \theta}{\sin (\theta)}
+
+$$
 
 Express $\ddot x$ and $\ddot \theta$ in in first order terms:
 
-$$ \ddot \theta = \frac{sin\theta F+\frac{1}{2}mr \sin(2\theta)\dot \theta^2-(M+m)g\cos \theta}{r((M+m)-m\sin^2\theta)}\\ \ddot x = \frac{g\cos(\theta)+\frac{sin\theta F+\frac{1}{2}mr \sin(2\theta)\dot \theta^2-(M+m)g\cos \theta}{(M+m)-m\sin^2\theta}}{\sin (\theta)} \\ \ddot x=\frac{-gm\cos\theta\sin^2\theta+\sin\theta F+\frac{mr}{2}\sin(2\theta)\dot \theta^2}{\sin\theta((M+m)-m\sin^2\theta)}$$
+$$ \ddot \theta = \frac{sin\theta F+\frac{1}{2}mr \sin(2\theta)\dot \theta^2-(M+m)g\cos \theta}{r((M+m)-m\sin^2\theta)}\\ \ddot x = \frac{g\cos(\theta)+\frac{sin\theta F+\frac{1}{2}mr \sin(2\theta)\dot \theta^2-(M+m)g\cos \theta}{(M+m)-m\sin^2\theta}}{\sin (\theta)} \\ \ddot x=\frac{-gm\cos\theta\sin^2\theta+\sin\theta F+\frac{mr}{2}\sin(2\theta)\dot \theta^2}{\sin\theta((M+m)-m\sin^2\theta)}
 
-$$\ddot x=\frac{-gm\cos\theta\sin^2\theta+\sin\theta F+\frac{mr}{2}\sin(2\theta)\dot \theta^2}{\sin\theta((M+m)-m\sin^2\theta)} \\ \ddot \theta = \frac{sin\theta F+\frac{1}{2}mr \sin(2\theta)\dot \theta^2-(M+m)g\cos \theta}{r((M+m)-m\sin^2\theta)} $$
+$$
+
+$$
+
+\ddot x=\frac{-gm\cos\theta\sin^2\theta+\sin\theta F+\frac{mr}{2}\sin(2\theta)\dot \theta^2}{\sin\theta((M+m)-m\sin^2\theta)} \\ \ddot \theta = \frac{sin\theta F+\frac{1}{2}mr \sin(2\theta)\dot \theta^2-(M+m)g\cos \theta}{r((M+m)-m\sin^2\theta)} $$
 
 $$ \ddot x=\frac{gm\sin(\phi)\cos(\phi)+F-mr\sin(\phi)\dot \phi^2}{(M+m)-m\cos^2(\phi)} \\ \ddot \phi = \frac{\cos(\phi) F-mr \cos(\phi)\sin(\phi)\dot \phi^2+(M+m)g\sin(\phi)}{r((M+m)-m\cos^2(\phi))} $$
 
@@ -97,7 +119,11 @@ For small φ: φ² ≈ 0 (neglect)
 
 $$ F=rM\ddot \theta-(M+m)g\phi=M\ddot x - gm \phi $$
 
-$$ \begin{bmatrix} x\\ \dot x\\ \phi\\ \dot \phi\\ \end{bmatrix}\begin{bmatrix} z_1\\ z_2\\ z_3\\ z_4\\ \end{bmatrix}$$
+# $$ \begin{bmatrix} x\\ \dot x\\ \phi\\ \dot \phi\\ \end{bmatrix}
+
+\begin{bmatrix} z_1\\ z_2\\ z_3\\ z_4\\ \end{bmatrix}
+
+$$
 
 where:
 
