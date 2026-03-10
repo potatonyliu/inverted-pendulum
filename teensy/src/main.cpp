@@ -1,3 +1,5 @@
+#include "core_pins.h"
+#include "usb_serial.h"
 #include <Arduino.h>
 
 #define XA_PIN 1
@@ -107,8 +109,6 @@ float compute_control(){
 
 void setup(){
     Serial.begin(115200);
-    while (!Serial && millis() < 2000);
-    Serial.println("System Initialized...");
     pinMode(XA_PIN, INPUT);
     pinMode(XB_PIN, INPUT);
     pinMode(PA_PIN, INPUT);
