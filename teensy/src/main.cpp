@@ -1,5 +1,3 @@
-#include "core_pins.h"
-#include "usb_serial.h"
 #include <Arduino.h>
 
 #define XA_PIN 1
@@ -10,7 +8,7 @@
 #define IN2_PIN 6
 #define ENA_PIN 7
 
-const float MAX_FORCE = 10;
+const float MAX_FORCE = 3;
 const float PULLEY_DIAMETER = 0.0225;
 const float METERS_PER_TICK = PI * PULLEY_DIAMETER / 403.2;
 const float RADIANS_PER_TICK = 2.0 * PI / 2400.0;
@@ -21,10 +19,10 @@ volatile long cart_ticks = 0;
 unsigned long t0;
 unsigned long last_print;
 float K[4] = {-1.0000, -3.1708, 80.2158, 24.9766};
-float state[4] = {0.0, 0.0, 0.0, 0.0};
+float state[4] = {0.0, 0.0, 0.1, 0.0};
 float F;
-float x;
-float phi;
+float x = 0;
+float phi = PI;
 float xdot;
 float phidot;
 float prev_x = 0.0;
@@ -109,6 +107,8 @@ float compute_control(){
 
 void setup(){
     Serial.begin(115200);
+    while (!Serial && millis() < 2000);
+    Serial.println("System Initialized...");
     pinMode(XA_PIN, INPUT);
     pinMode(XB_PIN, INPUT);
     pinMode(PA_PIN, INPUT);
