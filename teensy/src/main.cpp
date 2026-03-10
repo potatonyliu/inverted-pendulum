@@ -19,7 +19,7 @@ volatile long cart_ticks = 0;
 unsigned long t0;
 unsigned long last_print;
 float K[4] = {-1.0000, -3.1708, 80.2158, 24.9766};
-float state[4] = {0.0, 0.0, 0.1, 0.0};
+float state[4] = {0.0, 0.0, 0.0, 0.0};
 float F;
 float x = 0;
 float phi = PI;
