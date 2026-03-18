@@ -1,11 +1,9 @@
-#include "core_pins.h"
-#include "usb_serial.h"
 #include <Arduino.h>
 
 #define XA_PIN 1
 #define XB_PIN 2
 #define PA_PIN 3
-#define PB_PIN 4
+#define PB_PIN 9
 #define IN1_PIN 5
 #define IN2_PIN 6
 #define ENA_PIN 7
@@ -18,17 +16,22 @@ const float RADIANS_PER_TICK = 2.0 * PI / 2400.0;
 volatile long pendulum_ticks = 0;
 volatile long cart_ticks = 0;
 
+unsigned long t1;
 unsigned long t0;
 unsigned long last_print;
 float K[4] = {-1.0000, -3.1708, 80.2158, 24.9766};
 float state[4] = {0.0, 0.0, 0.0, 0.0};
-float F;
+float force_out;
 float x = 0;
 float phi = PI;
 float xdot;
 float phidot;
 float prev_x = 0.0;
 float prev_phi = 0.0;
+
+enum SystemState { IDLE, RUNNING };
+SystemState currentState = IDLE;
+
 
 // meters
 float read_position(){
@@ -58,8 +61,8 @@ void update_motor(float force){
 }
 
 void pendulum_A_handler(){
-    int A = digitalReadFast(PA_PIN);
-    int B = digitalReadFast(PB_PIN);
+    int A = digitalRead(PA_PIN);
+    int B = digitalRead(PB_PIN);
     if (A == B){
         pendulum_ticks--;
     }
@@ -69,8 +72,8 @@ void pendulum_A_handler(){
 }
 
 void pendulum_B_handler(){
-    int A = digitalReadFast(PA_PIN);
-    int B = digitalReadFast(PB_PIN);
+    int A = digitalRead(PA_PIN);
+    int B = digitalRead(PB_PIN);
     if (A != B){
         pendulum_ticks--;
     }
@@ -80,8 +83,8 @@ void pendulum_B_handler(){
 }
 
 void cart_A_handler(){
-    int A = digitalReadFast(XA_PIN);
-    int B = digitalReadFast(XB_PIN);
+    int A = digitalRead(XA_PIN);
+    int B = digitalRead(XB_PIN);
     if (A == B){
         cart_ticks--;
     }
@@ -91,8 +94,8 @@ void cart_A_handler(){
 }
 
 void cart_B_handler(){
-    int A = digitalReadFast(XA_PIN);
-    int B = digitalReadFast(XB_PIN);
+    int A = digitalRead(XA_PIN);
+    int B = digitalRead(XB_PIN);
     if (A != B){
         cart_ticks--;
     }
@@ -111,22 +114,23 @@ void setup(){
     Serial.begin(115200);
     pinMode(XA_PIN, INPUT);
     pinMode(XB_PIN, INPUT);
-    pinMode(PA_PIN, INPUT);
-    pinMode(PB_PIN, INPUT);
     pinMode(IN1_PIN, OUTPUT);
     pinMode(IN2_PIN, OUTPUT);
     pinMode(ENA_PIN, OUTPUT);
     t0 = micros();
+    t1 = micros();
     last_print = micros();
     attachInterrupt(XA_PIN, cart_A_handler, CHANGE);
     attachInterrupt(XB_PIN, cart_B_handler, CHANGE);
     attachInterrupt(PA_PIN, pendulum_A_handler, CHANGE);
     attachInterrupt(PB_PIN, pendulum_B_handler, CHANGE);
+    pinMode(PA_PIN, INPUT_PULLUP);
+    pinMode(PB_PIN, INPUT_PULLUP);
 
 }
 
 void loop() {
-    if (micros()-t0 >= 1000){
+    if (micros()-t1 >= 1000){
         x = read_position();
         phi = read_angle();
         xdot = (x-prev_x)/0.001;
@@ -137,17 +141,39 @@ void loop() {
         state[1] = xdot;
         state[2] = phi;
         state[3] = phidot;
-        F = compute_control();
-        update_motor(F);
-        t0 = micros();
+        force_out = compute_control();
+        if (Serial.available()) {
+            char c = Serial.read();
+            if (c == 'w' && currentState == IDLE) currentState = RUNNING;
+            if (c == 's' && currentState == RUNNING) currentState = IDLE;
+}
+
+if (currentState == RUNNING) update_motor(force_out);
+else update_motor(0);
+        t1 = micros();
     }
+    
+    // Force gentle stop at crash
+    if ((currentState == RUNNING) && ((x > 0.6) || (x < -0.6))) {
+            Serial.println("--- DETECTED CRASH ---");
+            currentState = IDLE;
+            Serial.println("--- MOTOR FORCE STOP ---");
+        }
+
+    if (currentState == IDLE){
+        // Reduce speed by 1 after 3ms
+            update_motor(0);
+            Serial.println("--- MOTOR OFF ---");
+        }
 
     // Serial print logs
     if (micros() - last_print >= 100000) {
         Serial.print(micros()/1000);
         Serial.println("ms");
+        Serial.print("State: ");
+        Serial.println(currentState);
         Serial.print("Force: ");
-        Serial.println(F);
+        Serial.println(force_out);
         Serial.print("x: ");
         Serial.println(x);
         Serial.print("xdot: ");
