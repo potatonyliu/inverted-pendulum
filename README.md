@@ -1,22 +1,3 @@
-# Recent Updates
-
-- fd001d5 added csv logging to main and exp_b; added records/ dir; csv/terminal toggle with per-mode hz; event column for state transitions
-- 98e7168 refactored into hardware/control modules; updated gitignore and platformio.ini
-- a5b9e13 updated firmware/; updated platformio.ini to compile experiment or main; updated main and exp_b to match architecture and states; added .gitignore
-- 5f4e89f added coast_motor() to cut power instead of brake for back-EMF testing
-- bf0fe8d Running test script on pico with crash protection; set P encoder pin mode after attachInterrupt(); Added serial input control for states; Added exp_b for PWM-force experiment
-- 52231b3 Resumed main.cpp with control logic
-- 27d808b Updated main.cpp param
-- 7e99400 Merge remote-tracking branch 'refs/remotes/origin/main'
-|\
-| * 5c2943a Formatted notes.md further
-- | fbb790c Added tests for hardware on Arduino; Preparing migration to Resberry Pie Pico
-|/
-- d5a42bc Formatted notes.md
-- 7e2b795 added notes.md
-- e097fe8 Added Teensy microcontroller; Adjusted parameters for simulations
-- 5ccdecd simulated pendulum with lqr control + precise dynamic without rotational inertial across different starting angles
-
 # How We Can Collaborate
 
 ## Setup
