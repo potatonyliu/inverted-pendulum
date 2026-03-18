@@ -23,7 +23,7 @@ float K[4] = {-1.0000, -3.1708, 80.2158, 24.9766};
 float state[4] = {0.0, 0.0, 0.0, 0.0};
 float F;
 float x = 0;
-float phi = PI;
+float phi = 0;
 float xdot;
 float phidot;
 float xddot;
@@ -35,9 +35,8 @@ float prev_xdot = 0.0;
 float prev_phidot = 0.0;
 
 int ENA;
-enum SystemState { RUNNING, ACCELERATING, TESTING, STOPPING, DEAD };
-SystemState currentState = RUNNING;
-unsigned long last_ramp_time = 0;
+enum SystemState { IDLE, RUNNING, ACCELERATING, TESTING };
+SystemState currentState = IDLE;
 
 float acc_threshold = 0.01;
 int consecutive_count_below_threshold = 0;
@@ -57,13 +56,11 @@ void update_motor(float force){
     if (force >= 0){
         digitalWrite(IN1_PIN, HIGH);
         digitalWrite(IN2_PIN, LOW);
-
     }
     else{
         digitalWrite(IN1_PIN, LOW);
         digitalWrite(IN2_PIN, HIGH);
     }
-    
     float magForce = (force >= 0) ? force : -force;
     int pwm = (int)(magForce / MAX_FORCE * 255);
     analogWrite(ENA_PIN, pwm);
@@ -73,65 +70,47 @@ void update_motor_directly(){
     if (ENA >= 0){
         digitalWrite(IN1_PIN, HIGH);
         digitalWrite(IN2_PIN, LOW);
-
     }
     else{
         digitalWrite(IN1_PIN, LOW);
         digitalWrite(IN2_PIN, HIGH);
     }
-    int pwm = (ENA);
-    analogWrite(ENA_PIN, pwm);
+    analogWrite(ENA_PIN, ENA);
 }
 
 void coast_motor(){
     digitalWrite(IN1_PIN, LOW);
     digitalWrite(IN2_PIN, LOW);
     ENA = 0;
-    analogWrite(ENA_PIN, ENA);
+    analogWrite(ENA_PIN, 0);
 }
 
 void pendulum_A_handler(){
     int A = digitalRead(PA_PIN);
     int B = digitalRead(PB_PIN);
-    if (A == B){
-        pendulum_ticks--;
-    }
-    else{
-        pendulum_ticks++;
-    }
+    if (A == B) pendulum_ticks--;
+    else        pendulum_ticks++;
 }
 
 void pendulum_B_handler(){
     int A = digitalRead(PA_PIN);
     int B = digitalRead(PB_PIN);
-    if (A != B){
-        pendulum_ticks--;
-    }
-    else{
-        pendulum_ticks++;
-    }
+    if (A != B) pendulum_ticks--;
+    else        pendulum_ticks++;
 }
 
 void cart_A_handler(){
     int A = digitalRead(XA_PIN);
     int B = digitalRead(XB_PIN);
-    if (A == B){
-        cart_ticks--;
-    }
-    else{
-        cart_ticks++;
-    }
+    if (A == B) cart_ticks--;
+    else        cart_ticks++;
 }
 
 void cart_B_handler(){
     int A = digitalRead(XA_PIN);
     int B = digitalRead(XB_PIN);
-    if (A != B){
-        cart_ticks--;
-    }
-    else{
-        cart_ticks++;
-    }
+    if (A != B) cart_ticks--;
+    else        cart_ticks++;
 }
 
 float compute_control(){
@@ -144,8 +123,6 @@ void setup(){
     Serial.begin(115200);
     pinMode(XA_PIN, INPUT);
     pinMode(XB_PIN, INPUT);
-    pinMode(PA_PIN, INPUT_PULLUP);
-    pinMode(PB_PIN, INPUT_PULLUP);
     pinMode(IN1_PIN, OUTPUT);
     pinMode(IN2_PIN, OUTPUT);
     pinMode(ENA_PIN, OUTPUT);
@@ -156,10 +133,24 @@ void setup(){
     attachInterrupt(XB_PIN, cart_B_handler, CHANGE);
     attachInterrupt(PA_PIN, pendulum_A_handler, CHANGE);
     attachInterrupt(PB_PIN, pendulum_B_handler, CHANGE);
+    pinMode(PA_PIN, INPUT_PULLUP);
+    pinMode(PB_PIN, INPUT_PULLUP);
     ENA = 100;
 }
 
 void loop() {
+    // Serial input
+    if (Serial.available()) {
+        char c = Serial.read();
+        if (c == 'w' && currentState == IDLE) {
+            currentState = RUNNING;
+            t0 = micros();
+            Serial.println("--- EXPERIMENT START ---");
+        }
+        if (c == 's') currentState = IDLE;
+    }
+
+    // 1ms control loop
     if (micros()-t1 >= 1000){
         x = read_position();
         phi = read_angle();
@@ -176,17 +167,14 @@ void loop() {
         state[2] = phi;
         state[3] = phidot;
         t1 = micros();
-        if (currentState == RUNNING || currentState == ACCELERATING){
-            update_motor_directly();
 
+        if (currentState == RUNNING || currentState == ACCELERATING){
             magXddot = (xddot >= 0) ? xddot : -xddot;
             if (magXddot <= acc_threshold){
                 consecutive_count_below_threshold++;
-            }
-            else {
+            } else {
                 consecutive_count_below_threshold = 0;
             }
-
             if (consecutive_count_below_threshold >= 10){
                 Serial.print("--- CONSTANT SPEED AT ");
                 Serial.print(xdot);
@@ -196,50 +184,34 @@ void loop() {
                 Serial.println("m/s^2 ---");
                 Serial.println("--- TEST START ---");
                 currentState = TESTING;
-                coast_motor();
             }
         }
     }
 
-    // Test can start only after 1 second
+    // Transition: RUNNING → ACCELERATING after 1 second
     if (currentState == RUNNING && micros()-t0 >= 1000000){
         currentState = ACCELERATING;
     }
 
-    // Force gentle stop at crash or after 10 seconds
-    if ((currentState == RUNNING || currentState == ACCELERATING || currentState == TESTING) && ((x > 1.2) || (x < -0.1)|| (micros() - t0 >= 10000000))) {
-        if (xdot <= 0.01) {
-            Serial.println("--- DETECTED CRASH ---");
-        }
-        else if ( micros() - t0 >= 3000000){
-            Serial.println("--- RAN OVER TIME LIMIT ---");
-        }
-            currentState = STOPPING;
-            last_ramp_time = micros();
-            Serial.println("--- MOTOR FORCE STOP ---");
-        }
-
-    if (currentState == STOPPING){
-        // Reduce speed by 1 after 3ms
-        if (micros() - last_ramp_time >= 3000){
-            last_ramp_time = micros();
-            if (ENA > 0){
-                ENA--;
-                update_motor_directly();
-            }
-            else {
-                ENA = 0;
-                update_motor_directly();
-                currentState = DEAD;
-                Serial.println("--- TEST COMPLETE: MOTOR OFF ---");
-            }
-        }
+    // Crash detection
+    if ((currentState == RUNNING || currentState == ACCELERATING || currentState == TESTING)
+        && (x > 1.2 || x < -0.1)) {
+        Serial.println("--- DETECTED CRASH ---");
+        currentState = IDLE;
     }
 
+    // State machine
+    if (currentState == RUNNING || currentState == ACCELERATING) {
+        update_motor_directly();
+    } else if (currentState == TESTING) {
+        coast_motor();
+    } else if (currentState == IDLE) {
+        coast_motor();
+    }
 
     // Serial print logs
-    if (micros() - last_print >= 10000) { // Higher freq (50Hz) for acceleration data
-        Serial.print(micros() - t0); // Relative time in micros
+    if (micros() - last_print >= 10000) {
+        Serial.print(micros() - t0);
         Serial.print(",");
         Serial.print(currentState);
         Serial.print(",");
@@ -254,13 +226,6 @@ void loop() {
         Serial.println(phidot, 4);
         last_print = micros();
     }
-
-    if (currentState == DEAD){
-        while(1) {
-            delay(1000);
-        }
-    }
 }
-// tio /dev/tty.usbmodem1234 --baud 115200 --log "motor_test_$(date +%Y%m%d_%H%M%S).csv"
-// ls /dev/tty.usb*
-// tio --list
+// pio device monitor -b 115200 | tee "motor_test_$(date +%Y%m%d_%H%M%S).csv"
+// pio device list

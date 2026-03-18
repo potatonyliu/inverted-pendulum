@@ -23,7 +23,7 @@ float K[4] = {-1.0000, -3.1708, 80.2158, 24.9766};
 float state[4] = {0.0, 0.0, 0.0, 0.0};
 float force_out;
 float x = 0;
-float phi = PI;
+float phi = 0;
 float xdot;
 float phidot;
 float prev_x = 0.0;
@@ -41,6 +41,12 @@ float read_position(){
 // radian
 float read_angle(){
     return pendulum_ticks * RADIANS_PER_TICK;
+}
+
+void coast_motor(){
+    digitalWrite(IN1_PIN, LOW);
+    digitalWrite(IN2_PIN, LOW);
+    analogWrite(ENA_PIN, 0);
 }
 
 // Newton
@@ -146,25 +152,22 @@ void loop() {
             char c = Serial.read();
             if (c == 'w' && currentState == IDLE) currentState = RUNNING;
             if (c == 's' && currentState == RUNNING) currentState = IDLE;
-}
-
-if (currentState == RUNNING) update_motor(force_out);
-else update_motor(0);
+        }
         t1 = micros();
     }
-    
-    // Force gentle stop at crash
-    if ((currentState == RUNNING) && ((x > 0.6) || (x < -0.6))) {
-            Serial.println("--- DETECTED CRASH ---");
-            currentState = IDLE;
-            Serial.println("--- MOTOR FORCE STOP ---");
-        }
 
-    if (currentState == IDLE){
-        // Reduce speed by 1 after 3ms
-            update_motor(0);
-            Serial.println("--- MOTOR OFF ---");
-        }
+    // Crash detection
+    if (currentState == RUNNING && (x > 0.6 || x < -0.6)) {
+        Serial.println("--- DETECTED CRASH ---");
+        currentState = IDLE;
+    }
+
+    // State machine
+    if (currentState == RUNNING) {
+        update_motor(force_out);
+    } else if (currentState == IDLE) {
+        coast_motor();
+    }
 
     // Serial print logs
     if (micros() - last_print >= 100000) {

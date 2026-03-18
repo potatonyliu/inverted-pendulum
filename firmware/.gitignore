@@ -1,0 +1,16 @@
+# PlatformIO build artifacts
+.pio/
+
+# Python virtual environment
+.venv/
+
+# macOS
+.DS_Store
+
+# Backup files
+*.bak
+
+# clangd (machine-specific paths)
+.clangd
+.cache/
+compile_commands.json
