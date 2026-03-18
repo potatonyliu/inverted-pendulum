@@ -79,9 +79,15 @@ void update_motor_directly(){
         digitalWrite(IN1_PIN, LOW);
         digitalWrite(IN2_PIN, HIGH);
     }
-
     int pwm = (ENA);
     analogWrite(ENA_PIN, pwm);
+}
+
+void coast_motor(){
+    digitalWrite(IN1_PIN, LOW);
+    digitalWrite(IN2_PIN, LOW);
+    ENA = 0;
+    analogWrite(ENA_PIN, ENA);
 }
 
 void pendulum_A_handler(){
@@ -190,8 +196,7 @@ void loop() {
                 Serial.println("m/s^2 ---");
                 Serial.println("--- TEST START ---");
                 currentState = TESTING;
-                ENA = 0;
-                update_motor_directly();
+                coast_motor();
             }
         }
     }
