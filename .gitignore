@@ -1,0 +1,4 @@
+.DS_Store
+
+# Raw experiment logs (local only)
+logs/

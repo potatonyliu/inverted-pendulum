@@ -14,6 +14,8 @@ float prev_phi = 0.0;
 
 enum SystemState { IDLE, RUNNING };
 SystemState currentState = IDLE;
+const char* event = "";
+bool csv_mode = true;
 
 void setup(){
     Serial.begin(115200);
@@ -38,16 +40,16 @@ void loop() {
         force_out = compute_control();
         if (Serial.available()) {
             char c = Serial.read();
-            if (c == 'w' && currentState == IDLE) currentState = RUNNING;
-            if (c == 's' && currentState == RUNNING) currentState = IDLE;
+            if (c == 'w' && currentState == IDLE) { currentState = RUNNING; event = "start"; }
+            if (c == 's' && currentState == RUNNING) { currentState = IDLE; event = "manual_stop"; }
         }
         t1 = micros();
     }
 
     // Crash detection
     if (currentState == RUNNING && (x > 0.6 || x < -0.6)) {
-        Serial.println("--- DETECTED CRASH ---");
         currentState = IDLE;
+        event = "crash";
     }
 
     // State machine
@@ -57,23 +59,30 @@ void loop() {
         coast_motor();
     }
 
-    // Serial print logs
-    if (micros() - last_print >= 100000) {
-        Serial.print(micros()/1000);
-        Serial.println("ms");
-        Serial.print("State: ");
-        Serial.println(currentState);
-        Serial.print("Force: ");
-        Serial.println(force_out);
-        Serial.print("x: ");
-        Serial.println(x);
-        Serial.print("xdot: ");
-        Serial.println(xdot);
-        Serial.print("phi: ");
-        Serial.println(phi);
-        Serial.print("phidot: ");
-        Serial.println(phidot);
-        Serial.println("=======================================");
+    if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
+        if (csv_mode) {
+            // time_us, state, force, x, xdot, phi, phidot, event
+            Serial.print(micros() - t0);   Serial.print(",");
+            Serial.print(currentState);     Serial.print(",");
+            Serial.print(force_out, 4);     Serial.print(",");
+            Serial.print(x, 4);             Serial.print(",");
+            Serial.print(xdot, 4);          Serial.print(",");
+            Serial.print(phi, 4);           Serial.print(",");
+            Serial.print(phidot, 4);        Serial.print(",");
+            Serial.println(event);
+        } else {
+            Serial.print(micros()/1000);    Serial.println("ms");
+            Serial.print("State: ");        Serial.println(currentState);
+            Serial.print("Force: ");        Serial.println(force_out);
+            Serial.print("x: ");            Serial.println(x);
+            Serial.print("xdot: ");         Serial.println(xdot);
+            Serial.print("phi: ");          Serial.println(phi);
+            Serial.print("phidot: ");       Serial.println(phidot);
+            if (event[0]) { Serial.print("Event: "); Serial.println(event); }
+            Serial.println("=======================================");
+        }
+        event = "";
         last_print = micros();
     }
 }
+// pio device monitor -b 115200 | tee "../logs/main_$(date +%Y%m%d_%H%M%S).csv"
