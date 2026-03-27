@@ -25,7 +25,7 @@ bool csv_mode = true;
 void setup(){
     Serial.begin(115200);
     hardware_setup();
-    ENA = 100;
+    ENA = 255;
     t1 = micros();
     t0 = micros();
     last_print = micros();
@@ -65,6 +65,7 @@ void loop() {
         t1 = micros();
 
         if (currentState == RUNNING || currentState == ACCELERATING){
+            ENA = 255;
             magXddot = (xddot >= 0) ? xddot : -xddot;
             if (magXddot <= acc_threshold){
                 consecutive_count_below_threshold++;
@@ -82,13 +83,6 @@ void loop() {
     if (currentState == RUNNING && micros()-t0 >= 1000000){
         currentState = ACCELERATING;
         event = "accelerating";
-    }
-
-    // Crash detection
-    if ((currentState == RUNNING || currentState == ACCELERATING || currentState == TESTING)
-        && (x > 1.2 || x < -0.1)) {
-        currentState = IDLE;
-        event = "crash";
     }
 
     // State machine

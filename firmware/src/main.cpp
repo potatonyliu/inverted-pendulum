@@ -44,12 +44,6 @@ void loop() {
         t1 = micros();
     }
 
-    // Crash detection
-    if (currentState == RUNNING && (x > 0.6 || x < -0.6)) {
-        currentState = IDLE;
-        event = "crash";
-    }
-
     // State machine
     if (currentState == RUNNING) {
         update_motor(force_out);
