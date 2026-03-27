@@ -1,4 +1,5 @@
 #include "hardware.h"
+#include "states.h"
 
 volatile long pendulum_ticks = 0;
 volatile long cart_ticks = 0;
@@ -76,6 +77,11 @@ void cart_B_handler(){
     else        cart_ticks++;
 }
 
+void limit_switch_handler(){
+    currentState = IDLE;
+    event = "crash (limit_switch)";
+}
+
 void hardware_setup(){
     pinMode(XA_PIN, INPUT);
     pinMode(XB_PIN, INPUT);
@@ -86,6 +92,10 @@ void hardware_setup(){
     attachInterrupt(XB_PIN, cart_B_handler, CHANGE);
     attachInterrupt(PA_PIN, pendulum_A_handler, CHANGE);
     attachInterrupt(PB_PIN, pendulum_B_handler, CHANGE);
+    attachInterrupt(LIMIT_L_PIN, limit_switch_handler, FALLING);
+    attachInterrupt(LIMIT_R_PIN, limit_switch_handler, FALLING);
     pinMode(PA_PIN, INPUT_PULLUP);
     pinMode(PB_PIN, INPUT_PULLUP);
+    pinMode(LIMIT_L_PIN, INPUT_PULLUP);
+    pinMode(LIMIT_R_PIN, INPUT_PULLUP);
 }

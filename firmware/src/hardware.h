@@ -8,6 +8,8 @@
 #define IN1_PIN 5
 #define IN2_PIN 6
 #define ENA_PIN 7
+#define LIMIT_L_PIN 10
+#define LIMIT_R_PIN 11
 
 const float MAX_FORCE = 3;
 const float PULLEY_DIAMETER = 0.0225;

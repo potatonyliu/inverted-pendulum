@@ -1,5 +1,6 @@
 #include "hardware.h"
 #include "control.h"
+#include "states.h"
 
 unsigned long t0;
 unsigned long t1;
@@ -17,12 +18,8 @@ float prev_phi = 0.0;
 float prev_xdot = 0.0;
 float prev_phidot = 0.0;
 
-enum SystemState { IDLE, RUNNING, ACCELERATING, TESTING };
-SystemState currentState = IDLE;
-
 float acc_threshold = 0.01;
 int consecutive_count_below_threshold = 0;
-const char* event = "";
 bool csv_mode = true;
 
 void setup(){

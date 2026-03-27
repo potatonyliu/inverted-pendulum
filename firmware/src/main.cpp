@@ -1,5 +1,6 @@
 #include "hardware.h"
 #include "control.h"
+#include "states.h"
 
 unsigned long t1;
 unsigned long t0;
@@ -12,10 +13,7 @@ float phidot;
 float prev_x = 0.0;
 float prev_phi = 0.0;
 
-enum SystemState { IDLE, RUNNING };
-SystemState currentState = IDLE;
-const char* event = "";
-bool csv_mode = true;
+bool csv_mode = false;
 
 void setup(){
     Serial.begin(115200);
@@ -78,6 +76,7 @@ void loop() {
             Serial.print("xdot: ");         Serial.println(xdot);
             Serial.print("phi: ");          Serial.println(phi);
             Serial.print("phidot: ");       Serial.println(phidot);
+            Serial.print("Cart Ticks: ");       Serial.println(cart_ticks);
             if (event[0]) { Serial.print("Event: "); Serial.println(event); }
             Serial.println("=======================================");
         }
