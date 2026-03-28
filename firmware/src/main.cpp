@@ -1,7 +1,9 @@
 #include "hardware.h"
 #include "control.h"
 #include "states.h"
+#include <sys/_intsup.h>
 
+unsigned long t2;
 unsigned long t1;
 unsigned long t0;
 unsigned long last_print;
@@ -25,11 +27,12 @@ void setup(){
 
 void loop() {
 
-    if (micros()-t1 >= 10000){
+    if (micros()-t2 >= 10000){
         xdot = (x-prev_x)/0.001;
         phidot = (phi-prev_phi)/0.001;
         prev_x = x;
         prev_phi = phi;
+        t2 = micros();
     }
     if (micros()-t1 >= 1000){
         x = read_position();
