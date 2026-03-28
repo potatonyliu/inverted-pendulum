@@ -1,4 +1,4 @@
-Time (μs)	State	ENA (0-255)	Position (m)	Velocity (m/s)	Acceleration (m/s^2)	Angular Position (radian)	Angular Velocity (radian/s)	Angular Acceleration (radian/s^2)	Event
+Time (μs),State,ENA (0-255),Position (m),Velocity (m/s),Acceleration (m/s^2),Angular Position (radian),Angular Velocity (radian/s),Angular Acceleration (radian/s^2),Event
 2124124,0,-3146.8286,0.0000,0.0000,3.1468,0.0000,
 2136088,0,-3146.8286,0.0000,0.0000,3.1468,0.0000,
 2147995,0,-3146.8286,0.0000,0.0000,3.1468,0.0000,
