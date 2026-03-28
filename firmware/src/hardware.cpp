@@ -12,12 +12,13 @@ float read_position(){
 
 // radians
 float read_angle(){
-    return pendulum_ticks * RADIANS_PER_TICK;
+    return pendulum_ticks * RADIANS_PER_TICK + PI;
 }
 
-// Newtons
-void update_motor(float force){
-    if (force >= 0){
+void update_motor(float force, float xdot){
+    float u = (force * TAU / CART_MASS + xdot) * (255.0 / V_SS);
+
+    if (u >= 0){
         digitalWrite(IN1_PIN, HIGH);
         digitalWrite(IN2_PIN, LOW);
     }
@@ -25,10 +26,27 @@ void update_motor(float force){
         digitalWrite(IN1_PIN, LOW);
         digitalWrite(IN2_PIN, HIGH);
     }
-    float magForce = (force >= 0) ? force : -force;
-    int pwm = (int)(magForce / MAX_FORCE * 255);
+
+    int pwm = (int)(u >= 0 ? u : -u);
+    if (pwm > 255) pwm = 255;
+    ENA = pwm;
     analogWrite(ENA_PIN, pwm);
 }
+
+// Newtons
+// void update_motor(float force){
+//     if (force >= 0){
+//         digitalWrite(IN1_PIN, HIGH);
+//         digitalWrite(IN2_PIN, LOW);
+//     }
+//     else{
+//         digitalWrite(IN1_PIN, LOW);
+//         digitalWrite(IN2_PIN, HIGH);
+//     }
+//     float magForce = (force >= 0) ? force : -force;
+//     int pwm = (int)(magForce / MAX_FORCE * 255);
+//     analogWrite(ENA_PIN, pwm);
+// }
 
 void update_motor_directly(){
     if (ENA >= 0){

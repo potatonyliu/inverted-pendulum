@@ -46,7 +46,7 @@ void loop() {
 
     // State machine
     if (currentState == RUNNING) {
-        update_motor(force_out);
+        update_motor(force_out, state[1]);
     } else if (currentState == IDLE) {
         coast_motor();
     }
@@ -71,6 +71,7 @@ void loop() {
             Serial.print("phi: ");          Serial.println(phi);
             Serial.print("phidot: ");       Serial.println(phidot);
             Serial.print("Cart Ticks: ");       Serial.println(cart_ticks);
+            Serial.print("PWM: ");       Serial.println(ENA);
             if (event[0]) { Serial.print("Event: "); Serial.println(event); }
             Serial.println("=======================================");
         }
