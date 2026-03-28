@@ -13,7 +13,7 @@ float phidot;
 float prev_x = 0.0;
 float prev_phi = 0.0;
 
-bool csv_mode = false;
+bool csv_mode = true;
 
 void setup(){
     Serial.begin(115200);
