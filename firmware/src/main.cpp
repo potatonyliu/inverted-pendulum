@@ -24,13 +24,16 @@ void setup(){
 }
 
 void loop() {
-    if (micros()-t1 >= 1000){
-        x = read_position();
-        phi = read_angle();
+
+    if (micros()-t1 >= 10000){
         xdot = (x-prev_x)/0.001;
         phidot = (phi-prev_phi)/0.001;
         prev_x = x;
         prev_phi = phi;
+    }
+    if (micros()-t1 >= 1000){
+        x = read_position();
+        phi = read_angle();
         state[0] = x;
         state[1] = xdot;
         state[2] = phi;
@@ -38,7 +41,7 @@ void loop() {
         force_out = compute_control();
         if (Serial.available()) {
             char c = Serial.read();
-            if (c == 'w' && currentState == IDLE) { currentState = RUNNING; event = "start"; }
+            if (c == 'w' && currentState == IDLE) { currentState = RUNNING; event = "start"; t0 = micros();}
             if (c == 's' && currentState == RUNNING) { currentState = IDLE; event = "manual_stop"; }
         }
         t1 = micros();
