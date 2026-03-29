@@ -11,7 +11,7 @@
 #define LIMIT_L_PIN 10
 #define LIMIT_R_PIN 11
 
-const float CART_MASS = 1;
+const float CART_MASS = 1.54915;
 const float TAU = 0.133;
 const float V_SS = 0.877;
 

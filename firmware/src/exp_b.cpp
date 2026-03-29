@@ -4,6 +4,8 @@
 
 unsigned long t0;
 unsigned long t1;
+unsigned long t2;
+unsigned long t3;
 unsigned long last_print;
 float force_out;
 float x = 0;
@@ -26,6 +28,8 @@ void setup(){
     Serial.begin(115200);
     hardware_setup();
     ENA = 255;
+    t3 = micros();
+    t2 = micros();
     t1 = micros();
     t0 = micros();
     last_print = micros();
@@ -45,45 +49,38 @@ void loop() {
             event = "manual_stop";
         }
     }
+    
+    if (micros()-t3 >= 100000){
+        xddot = (xdot-prev_xdot)/0.1;
+        phiddot = (phidot-prev_phidot)/0.1;
+        prev_xdot = xdot;
+        prev_phidot = phidot;
+        t3 = micros();
+    }
 
+    if (micros()-t2 >= 10000){
+        xdot = (x-prev_x)/0.01;
+        phidot = (phi-prev_phi)/0.01;
+        prev_x = x;
+        prev_phi = phi;
+        t2 = micros();
+    }
     // 1ms control loop
     if (micros()-t1 >= 1000){
         x = read_position();
         phi = read_angle();
-        xdot = (x-prev_x)/0.001;
-        phidot = (phi-prev_phi)/0.001;
-        xddot = (xdot-prev_xdot)/0.001;
-        phiddot = (phidot-prev_phidot)/0.001;
-        prev_x = x;
-        prev_phi = phi;
-        prev_xdot = xdot;
-        prev_phidot = phidot;
         state[0] = x;
         state[1] = xdot;
         state[2] = phi;
         state[3] = phidot;
         t1 = micros();
+    }
 
         if (currentState == RUNNING || currentState == ACCELERATING){
             ENA = 255;
-            magXddot = (xddot >= 0) ? xddot : -xddot;
-            if (magXddot <= acc_threshold){
-                consecutive_count_below_threshold++;
-            } else {
-                consecutive_count_below_threshold = 0;
-            }
-            if (consecutive_count_below_threshold >= 10){
-                currentState = TESTING;
-                event = "test_start";
-            }
-        }
     }
 
     // Transition: RUNNING → ACCELERATING after 1 second
-    if (currentState == RUNNING && micros()-t0 >= 1000000){
-        currentState = ACCELERATING;
-        event = "accelerating";
-    }
 
     // State machine
     if (currentState == RUNNING || currentState == ACCELERATING) {

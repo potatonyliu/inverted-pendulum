@@ -53,6 +53,10 @@ void loop() {
 
     // State machine
     if (currentState == RUNNING) {
+        if (phi > PI/2.0 or phi < -PI/2.0) {
+            currentState = IDLE;
+            event = "crash (angle)";
+        }
         update_motor(force_out, state[1]);
     } else if (currentState == IDLE) {
         coast_motor();
