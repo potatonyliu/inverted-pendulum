@@ -38,8 +38,8 @@ Units:
 
 # ── CONFIG — edit these ────────────────────────────────────────────────────────
 
-CSV_PATH   = "logs/motor_test_20260329_105457.csv"   # path to your CSV log
-RUN_LABEL  = "dancing-queen-03"                        # name shown in plot titles
+CSV_PATH   = "logs/runtime-test-05_20260329_141758.csv"   # path to your CSV log
+RUN_LABEL  = "dancing-queen-04"                        # name shown in plot titles
 K_GAINS    = [10.0, 50.0, 152.4200, 30.0335]      # K = [K1, K2, K3, K4]
 
 OUTPUT_DIR = "."   # folder to save PNGs (use "." for current directory)
