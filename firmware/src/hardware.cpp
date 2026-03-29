@@ -96,8 +96,8 @@ void cart_B_handler(){
 }
 
 void limit_switch_handler(){
-    currentState = IDLE;
-    event = "crash (limit_switch)";
+    // currentState = IDLE;
+    event = "crash (limit_switch - DISABLED)";
 }
 
 void hardware_setup(){
