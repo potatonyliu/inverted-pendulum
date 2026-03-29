@@ -13,7 +13,7 @@ plot_lqr_run.py
 Plots a single LQR inverted pendulum run from a CSV log.
 
 CSV format (no header row, 9 columns):
-    t_us, state, ENA, x, xdot, phi, phidot, event, extra
+    t_us, state, Force, x, xdot, phi, phidot, event, extra
 
 State values:
     1 = controller active (LQR running)
@@ -25,7 +25,7 @@ Events expected in the 'event' column:
 
 Units:
     t_us   : microseconds
-    ENA    : raw control output (float)
+    Force  : raw control output (float)
     x      : meters
     xdot   : m/s
     phi    : radians  (0 = upright, ±π = hanging down)
@@ -72,10 +72,10 @@ GRAY   = '#8b949e'
 
 # ── Load & parse ───────────────────────────────────────────────────────────────
 # Auto-detects whether the file has a header row or not.
-# Header row is expected to look like: "Time (μs),State,ENA (0-255),..."
+# Header row is expected to look like: "Time (μs),State,Force (N),..."
 # If the first cell is not numeric, it is treated as a header and skipped.
 
-COL_NAMES = ['t_us', 'state', 'ENA', 'x', 'xdot', 'phi', 'phidot', 'event', 'extra']
+COL_NAMES = ['t_us', 'state', 'Force', 'x', 'xdot', 'phi', 'phidot', 'event', 'extra']
 
 with open(CSV_PATH, 'r') as f:
     first_cell = f.readline().split(',')[0].strip()
@@ -88,7 +88,7 @@ if has_header:
     # Rename whatever the actual header says to our standard names
     df.columns = COL_NAMES[:len(df.columns)]
 
-for c in ['t_us', 'state', 'ENA', 'x', 'xdot', 'phi', 'phidot']:
+for c in ['t_us', 'state', 'Force', 'x', 'xdot', 'phi', 'phidot']:
     df[c] = pd.to_numeric(df[c], errors='coerce')
 df['event'] = df['event'].fillna('').astype(str).str.strip()
 df = df.dropna(subset=['t_us'])
@@ -119,7 +119,7 @@ def savefig(fig, name):
     print(f"Saved: {path}")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FIG 1 — Full timeline: φ, x, ENA
+# FIG 1 — Full timeline: φ, x, Force
 # ══════════════════════════════════════════════════════════════════════════════
 fig1, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
 fig1.suptitle(title_base, fontsize=12, fontweight='bold', color=WHITE, y=0.99)
@@ -155,14 +155,14 @@ ax.set_title('Cart Position', loc='left')
 ax.legend(fontsize=8, loc='upper right', framealpha=0.2)
 ax.grid(True, lw=0.5)
 
-# ENA
+# Force
 ax = axes[2]
-ax.plot(ctrl['t_s'], ctrl['ENA'], color=PURPLE, lw=0.9, alpha=0.9, label='State=1')
+ax.plot(ctrl['t_s'], ctrl['Force'], color=PURPLE, lw=0.9, alpha=0.9, label='State=1')
 if not post.empty:
-    ax.plot(post['t_s'], post['ENA'], color=GRAY, lw=0.8, alpha=0.5, label='State=0')
+    ax.plot(post['t_s'], post['Force'], color=GRAY, lw=0.8, alpha=0.5, label='State=0')
 ax.axhline(0, color=WHITE, lw=0.5, ls='--', alpha=0.2)
 ax.axvline(dur, color=RED, lw=1.5, ls='--', alpha=0.8)
-ax.set_ylabel('ENA  (control output)')
+ax.set_ylabel('Force  (N)')
 ax.set_xlabel('Time  (s)  [from controller start]')
 ax.set_title('Control Output', loc='left')
 ax.legend(fontsize=8, loc='upper right', framealpha=0.2)
