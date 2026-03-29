@@ -1,4 +1,11 @@
 # Results
+[`records/dancing-queen-02_20260328_211616.csv`](https://github.com/potatonyliu/inverted-pendulum/blob/main/records/dancing-queen-02_20260328_211616.csv):
+
+Same spec, this time for 4 minutes! Again stopped at false crash detection.
+<img width="1947" height="1395" alt="dancing-queen-02_fig1_overview" src="https://github.com/user-attachments/assets/d3b598c8-a910-4b71-88c8-e671d5893fa8" />
+
+
+
 [`records/dancing-queen_20260328_204710.csv`](https://github.com/potatonyliu/inverted-pendulum/blob/main/records/dancing-queen_20260328_204710.csv):
 
 Balanced for 69.64s - The limit switch pin might've deteched or touched something by accident, it did not hit the edge but detected crash - it wouldn've kept going!
