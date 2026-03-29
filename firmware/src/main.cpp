@@ -22,14 +22,15 @@ void setup(){
     hardware_setup();
     t0 = micros();
     t1 = micros();
+    t2 = micros();
     last_print = micros();
 }
 
 void loop() {
 
     if (micros()-t2 >= 10000){
-        xdot = (x-prev_x)/0.001;
-        phidot = (phi-prev_phi)/0.001;
+        xdot = (x-prev_x)/0.01;
+        phidot = (phi-prev_phi)/0.01;
         prev_x = x;
         prev_phi = phi;
         t2 = micros();
