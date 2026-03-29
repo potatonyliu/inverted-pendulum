@@ -1,3 +1,10 @@
+# Results
+[`records/dancing-queen_20260328_204710.csv`](https://github.com/potatonyliu/inverted-pendulum/blob/main/records/dancing-queen_20260328_204710.csv):
+
+Balanced for 69.64s - The limit switch pin might've deteched or touched something by accident, it did not hit the edge but detected crash - it wouldn've kept going!
+<img width="1948" height="1394" alt="image" src="https://github.com/user-attachments/assets/a54409ec-c78d-4f7f-9408-f69a101e3c89" />
+
+
 # How We Can Collaborate
 
 ## Setup
