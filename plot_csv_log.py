@@ -38,8 +38,8 @@ Units:
 
 # ── CONFIG — edit these ────────────────────────────────────────────────────────
 
-CSV_PATH   = "records/dancing-queen-02_20260328_211616.csv"   # path to your CSV log
-RUN_LABEL  = "dancing-queen-02"                        # name shown in plot titles
+CSV_PATH   = "logs/motor_test_20260329_105457.csv"   # path to your CSV log
+RUN_LABEL  = "dancing-queen-03"                        # name shown in plot titles
 K_GAINS    = [10.0, 50.0, 152.4200, 30.0335]      # K = [K1, K2, K3, K4]
 
 OUTPUT_DIR = "."   # folder to save PNGs (use "." for current directory)
@@ -77,12 +77,22 @@ GRAY   = '#8b949e'
 
 COL_NAMES = ['t_us', 'state', 'Force', 'x', 'xdot', 'phi', 'phidot', 'event', 'extra']
 
+# Find the first data line, skipping PlatformIO preamble (lines starting with '---')
 with open(CSV_PATH, 'r') as f:
-    first_cell = f.readline().split(',')[0].strip()
+    lines = f.readlines()
+skip = 0
+for line in lines:
+    stripped = line.strip()
+    if stripped.startswith('---') or stripped == '':
+        skip += 1
+    else:
+        break
+first_cell = lines[skip].split(',')[0].strip() if skip < len(lines) else ''
 
 has_header = not first_cell.lstrip('-').replace('.', '', 1).isdigit()
 df = pd.read_csv(CSV_PATH, header=0 if has_header else None,
-                 skiprows=0, names=None if has_header else COL_NAMES)
+                 skiprows=skip if not has_header else skip,
+                 names=None if has_header else COL_NAMES)
 
 if has_header:
     # Rename whatever the actual header says to our standard names
