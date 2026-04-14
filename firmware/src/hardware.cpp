@@ -35,10 +35,12 @@ void update_motor(float force, float xdot){
     float u = (force * TAU / CART_MASS + xdot) * (255.0 / V_SS);
 
     if (u >= 0){
-        digitalWrite(IN_PIN, HIGH);
+        digitalWrite(IN1_PIN, HIGH);
+        digitalWrite(IN2_PIN, LOW);
     }
     else{
-        digitalWrite(IN_PIN, LOW);
+        digitalWrite(IN1_PIN, LOW);
+        digitalWrite(IN2_PIN, HIGH);
     }
 
     int pwm = (int)(u >= 0 ? u : -u);
@@ -64,10 +66,12 @@ void update_motor(float force, float xdot){
 
 void update_motor_directly(){
     if (ENA >= 0){
-        digitalWrite(IN2_PIN, HIGH);
+        digitalWrite(IN1_PIN, HIGH);
+        digitalWrite(IN2_PIN, LOW);
     }
     else{
-        digitalWrite(IN2_PIN, LOW);
+        digitalWrite(IN1_PIN, LOW);
+        digitalWrite(IN2_PIN, HIGH);
     }
     int pwm = (int)(ENA >= 0 ? ENA : -ENA);
     analogWrite(ENA_PIN, pwm);

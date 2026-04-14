@@ -1,9 +1,6 @@
-#include "WCharacter.h"
-#include "core_pins.h"
 #include "hardware.h"
 #include "control.h"
 #include "states.h"
-#include <sys/_intsup.h>
 
 unsigned long t1;
 unsigned long t0;
@@ -23,12 +20,12 @@ float xdot_hat = 0.0;
 float phi_hat = 0.0;
 float phidot_hat = 0.0;
 
-float kp_x = 2000.0;
+float kp_x = 0.1;
 float kp_xdot = 0.1;
-float kp_phi = 2000.0;
+float kp_phi = 0.1;
 float kp_phidot = 0.1;
 
-bool csv_mode = true;
+bool csv_mode = false;
 
 void setup(){
     Serial.begin(115200);
