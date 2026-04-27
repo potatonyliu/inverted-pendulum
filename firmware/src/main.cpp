@@ -9,21 +9,20 @@ float force_out;
 float x = 0;
 float phi = 0;
 float xdot;
-float prev_xdot = 0.0;
-float alpha = 0.3;
 float phidot;
-float prev_phidot = 0.0;
-float beta = 0.3;
 
-float x_hat = 0.0;
-float xdot_hat = 0.0;
-float phi_hat = 0.0;
-float phidot_hat = 0.0;
+// --- Alpha-Beta tracker state ---
+float x_hat = 0.0f;
+float xdot_hat = 0.0f;
+float phi_hat = 0.0f;
+float phidot_hat = 0.0f;
 
-float kp_x = 0.1;
-float kp_xdot = 0.1;
-float kp_phi = 0.1;
-float kp_phidot = 0.1;
+// --- Tracker gains ---
+const float DT         = 1e-3f;
+const float ALPHA_X    = 0.2f;   // position correction gain, cart
+const float BETA_X     = 0.05f;  // velocity correction gain, cart
+const float ALPHA_PHI  = 0.2f;   // position correction gain, pendulum
+const float BETA_PHI   = 0.05f;  // velocity correction gain, pendulum
 
 bool csv_mode = false;
 
@@ -46,15 +45,18 @@ void loop() {
         phidot = read_pendulum_velocity();
         // phidot = beta * phidot + (1-beta) * prev_phidot;
         // prev_phidot = phidot;
+
         // TRACKING LOOP
-        x_hat += xdot_hat * 1e-3f;
-        float e_x = x - x_hat;
-        xdot_hat += e_x * kp_xdot;
-        x_hat += e_x * kp_x;
-        phi_hat += phidot_hat * 1e-3f;
-        float e_phi = phi - phi_hat;
-        phidot_hat += e_phi * kp_phidot;
-        phi_hat += e_phi * kp_phi;
+        x_hat    += xdot_hat * DT;      // predict
+        float e_x = x - x_hat;          // residual (meters)
+        x_hat    += ALPHA_X * e_x;
+        xdot_hat += (BETA_X / DT) * e_x;
+
+        phi_hat    += phidot_hat * DT;  // predict
+        float e_phi = phi - phi_hat;    // residual (radians)
+        phi_hat    += ALPHA_PHI * e_phi;
+        phidot_hat += (BETA_PHI / DT) * e_phi;
+
         state[0] = x;
         state[1] = xdot_hat;
         state[2] = phi;

@@ -32,9 +32,16 @@ float read_pendulum_velocity(unsigned long stale_us){
 }
 
 void update_motor(float force, float xdot){
+    if (force < 3 && force > -3){
+        force = 0;
+    }
     float u = (force * TAU / CART_MASS + xdot) * (255.0 / V_SS);
 
-    if (u >= 0){
+    if (u == 0){
+        digitalWrite(IN1_PIN, LOW);
+        digitalWrite(IN2_PIN, LOW);
+    }
+    else if (u > 0){
         digitalWrite(IN1_PIN, HIGH);
         digitalWrite(IN2_PIN, LOW);
     }

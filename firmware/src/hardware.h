@@ -7,7 +7,7 @@
 #define PB_PIN 9
 #define IN1_PIN 13
 #define IN2_PIN 6
-#define ENA_PIN 7
+#define ENA_PIN 15
 #define LIMIT_L_PIN 10
 #define LIMIT_R_PIN 11
 

@@ -11,7 +11,7 @@ float xdot      = 0;   // current method: tick-timing
 float xdot_10ms = 0;   // original method: 10ms finite difference
 float prev_x    = 0.0;
 
-bool csv_mode = true;
+bool csv_mode = false;
 
 void setup(){
     Serial.begin(115200);
