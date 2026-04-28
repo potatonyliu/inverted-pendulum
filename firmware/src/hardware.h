@@ -11,12 +11,12 @@
 #define LIMIT_L_PIN 10
 #define LIMIT_R_PIN 11
 
-const float CART_MASS = 1.54915;
+const float CART_MASS = 1.04915;
 const float TAU = 0.102;
 const float V_SS = 0.93;
 
 // const float MAX_FORCE = 7.7;
-const float PULLEY_DIAMETER = 0.0225;
+const float PULLEY_DIAMETER = 0.025;
 const float METERS_PER_TICK = PI * PULLEY_DIAMETER / 403.2;
 const float RADIANS_PER_TICK = 2.0 * PI / 2400.0;
 

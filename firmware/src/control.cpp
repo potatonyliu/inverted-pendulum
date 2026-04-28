@@ -1,6 +1,6 @@
 #include "control.h"
 
-float K[4] = {10.0, 50.0, 152.4200, 30.0335};
+float K[4] = {20.0, 50.0, 152.4200, 30.0335};
 float state[4] = {0.0, 0.0, 0.0, 0.0};
 
 float compute_control(){
