@@ -1,4 +1,9 @@
 # Results
+[`records/bad-piggies-02_20260505_164015.csv`](https://github.com/potatonyliu/inverted-pendulum/blob/main/records/bad-piggies-02_20260505_164015.csv):
+
+Larger `k[0]`, beta = 0.3 (EMA velocity smoothing), 33 minutes.
+<img width="1947" height="1395" alt="bad-piggies-02_fig1_overview" src="https://github.com/user-attachments/assets/a34c12e5-d5ba-4927-a980-8b25f45fcf03" />
+
 [`records/dancing-queen-03_20260329_105457.csv`](https://github.com/potatonyliu/inverted-pendulum/blob/main/records/dancing-queen-03_20260329_105457.csv):
 
 Same spec, removed limit switch and instead use phi for crash detection. Ran for 5 minutes and lost balance. Motor constantly saturates, we might need lower cart mass or stronger motor. Right now the jittering is caused by continued saturation of PWM and over-compensation. We have an issue with the gain values from MATLAB, it is consistently giving forces over the max force producable by our motor (around 6.5-10N) for diviations within 1 std of a typical run. The easiest fix right now is to reduce cart mass. I already tested that adjusting Q and R to make max force fall below 8N in 1 std of phi in a typical run did not work (it requires higher force later, which is a problem, std changes). I haven't figured this out yet.
