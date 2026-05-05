@@ -4,10 +4,10 @@
 #define XA_PIN 1
 #define XB_PIN 2
 #define PA_PIN 3
-#define PB_PIN 9
-#define IN1_PIN 13
-#define IN2_PIN 6
-#define ENA_PIN 15
+#define PB_PIN 4
+#define ENA_PIN 5
+#define IN1_PIN 6
+#define IN2_PIN 7
 #define LIMIT_L_PIN 10
 #define LIMIT_R_PIN 11
 

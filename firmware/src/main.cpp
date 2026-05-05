@@ -15,7 +15,7 @@ float phidot;
 float prev_xdot = 0.0;
 float prev_phidot = 0.0;
 float alpha = 1;
-float beta = 1;
+float beta = 0.3;
 
 // --- Alpha-Beta tracker state ---
 float x_hat = 0.0f;

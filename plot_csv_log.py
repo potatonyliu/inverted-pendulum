@@ -38,8 +38,8 @@ Units:
 
 # ── CONFIG — edit these ────────────────────────────────────────────────────────
 
-CSV_PATH   = "logs/balance_test_20260428_172753.csv"   # path to your CSV log
-RUN_LABEL  = "bad-piggies-01"                        # name shown in plot titles
+CSV_PATH   = "logs/balance_test_20260505_164015.csv"   # path to your CSV log
+RUN_LABEL  = "bad-piggies-02"                        # name shown in plot titles
 K_GAINS    = [10.0, 50.0, 152.4200, 30.0335]      # K = [K1, K2, K3, K4]
 
 OUTPUT_DIR = "."   # folder to save PNGs (use "." for current directory)
