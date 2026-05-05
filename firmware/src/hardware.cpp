@@ -15,9 +15,14 @@ float read_position(){
     return cart_ticks * METERS_PER_TICK;
 }
 
-// radians
+// radians, wrapped to (-PI, PI] with 0 = upright. Discontinuity is at the
+// antipode (hanging) — safe because LQR / crash check / auto-balance all
+// operate near 0 and never see the wrap.
 float read_angle(){
-    return pendulum_ticks * RADIANS_PER_TICK + PI;
+    float a = pendulum_ticks * RADIANS_PER_TICK + PI;
+    while (a >  PI) a -= 2.0f * PI;
+    while (a < -PI) a += 2.0f * PI;
+    return a;
 }
 
 // Returns 0 if no tick received within stale_us (system stopped)

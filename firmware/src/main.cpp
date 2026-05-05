@@ -2,6 +2,10 @@
 #include "control.h"
 #include "states.h"
 
+extern void joystick_setup();
+extern void joystick_tick(float xdot);
+extern bool joystick_connected();
+
 unsigned long t1;
 unsigned long t0;
 unsigned long last_print;
@@ -15,7 +19,7 @@ float phidot;
 float prev_xdot = 0.0;
 float prev_phidot = 0.0;
 float alpha = 1;
-float beta = 0.3;
+float beta = 0.2;
 
 // --- Alpha-Beta tracker state ---
 float x_hat = 0.0f;
@@ -30,11 +34,12 @@ const float BETA_X     = 0.05f;  // velocity correction gain, cart
 const float ALPHA_PHI  = 0.2f;   // position correction gain, pendulum
 const float BETA_PHI   = 0.05f;  // velocity correction gain, pendulum
 
-bool csv_mode = true;
+bool csv_mode = false;
 
 void setup(){
     Serial.begin(115200);
     hardware_setup();
+    joystick_setup();
     t0 = micros();
     t1 = micros();
     last_print = micros();
@@ -72,8 +77,17 @@ void loop() {
             char c = Serial.read();
             if (c == 'w' && currentState == IDLE) { currentState = RUNNING; event = "start"; t0 = micros();}
             if (c == 's' && currentState == RUNNING) { currentState = IDLE; event = "manual_stop"; }
+            if (c == 'j' && currentState == IDLE) { currentState = JOYSTICK; event = "joystick_on"; }
+            else if (c == 'j' && currentState == JOYSTICK) { currentState = IDLE; event = "joystick_off"; }
         }
         t1 = micros();
+    }
+
+    // Auto-balance: hand off to LQR when pendulum is swung near upright.
+    if ((currentState == JOYSTICK) && fabsf(phi) < 0.2f) {
+        currentState = RUNNING;
+        event = "auto_balance";
+        t0 = micros();
     }
 
     // State machine
@@ -85,6 +99,8 @@ void loop() {
         update_motor(force_out, state[1]);
     } else if (currentState == IDLE) {
         coast_motor();
+    } else if (currentState == JOYSTICK) {
+        joystick_tick(state[1]);
     }
 
     if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
