@@ -23,9 +23,9 @@ static constexpr uint8_t  INQUIRY_DURATION    = 3;
 // check the serial output while pressing each button to find the right masks.
 // #define JOY_BTN_DEBUG
 static constexpr uint8_t BTN_BYTE   = 5;
-static constexpr uint8_t BTN_X_MASK = 0x08;  // X  → IDLE
-static constexpr uint8_t BTN_Y_MASK = 0x04;  // Y  → JOYSTICK swing-up
-static constexpr uint8_t BTN_A_MASK = 0x01;  // A  → AUTO_SWINGUP
+static constexpr uint8_t BTN_X_MASK = 0x80;  // X  → IDLE
+static constexpr uint8_t BTN_Y_MASK = 0x10;  // Y  → JOYSTICK swing-up
+static constexpr uint8_t BTN_A_MASK = 0x40;  // A  → AUTO_SWINGUP
 
 namespace {
 
