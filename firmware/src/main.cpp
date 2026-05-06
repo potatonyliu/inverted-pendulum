@@ -83,8 +83,8 @@ void loop() {
         t1 = micros();
     }
 
-    // Auto-balance: hand off to LQR when pendulum is swung near upright.
-    if ((currentState == JOYSTICK) && fabsf(phi) < 0.2f) {
+    // Hand off to LQR when pendulum is near upright, from either swing-up mode.
+    if ((currentState == JOYSTICK || currentState == AUTO_SWINGUP) && fabsf(phi) < 0.2f) {
         currentState = RUNNING;
         event = "auto_balance";
         t0 = micros();
@@ -101,8 +101,11 @@ void loop() {
         coast_motor();
     } else if (currentState == JOYSTICK) {
         joystick_tick(state[1]);
+    } else if (currentState == AUTO_SWINGUP) {
+        // placeholder — swap in friend's swing-up logic here
+        coast_motor();
     }
-
+    
     if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
         if (csv_mode) {
             // time_us, state, force, x, xdot, phi, phidot, event

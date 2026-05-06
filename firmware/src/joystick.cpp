@@ -18,10 +18,21 @@ static constexpr int      MAX_JOY_PWM         = 255;
 static constexpr uint32_t INACTIVE_TIMEOUT_MS = 500;
 static constexpr uint8_t  INQUIRY_DURATION    = 3;
 
+// Button byte index and bitmasks for 8BitDo in D-mode.
+// If buttons don't respond correctly, uncomment JOY_BTN_DEBUG below and
+// check the serial output while pressing each button to find the right masks.
+// #define JOY_BTN_DEBUG
+static constexpr uint8_t BTN_BYTE   = 5;
+static constexpr uint8_t BTN_X_MASK = 0x80;  // X  → IDLE
+static constexpr uint8_t BTN_Y_MASK = 0x10;  // Y  → JOYSTICK swing-up
+static constexpr uint8_t BTN_A_MASK = 0x40;  // A  → AUTO_SWINGUP
+
 namespace {
 
 struct PadState {
-    uint8_t  lx = AXIS_CENTRE;
+    uint8_t  lx           = AXIS_CENTRE;
+    uint8_t  buttons      = 0;
+    uint8_t  prev_buttons = 0;
     uint32_t last_report_ms = 0;
     bool     connected = false;
 };
@@ -52,6 +63,33 @@ void handle_report(const uint8_t* r, uint16_t n) {
     if (n < 2) return;
     g_pad.lx = r[1];
     g_pad.last_report_ms = millis();
+
+    if (n > BTN_BYTE) {
+        g_pad.prev_buttons = g_pad.buttons;
+        g_pad.buttons      = r[BTN_BYTE];
+        uint8_t pressed    = g_pad.buttons & ~g_pad.prev_buttons;
+
+        if (pressed & BTN_X_MASK) {
+            currentState = IDLE;
+            event = "button_idle";
+            coast_motor();
+        } else if (pressed & BTN_Y_MASK) {
+            currentState = JOYSTICK;
+            event = "button_joystick";
+        } else if (pressed & BTN_A_MASK) {
+            currentState = AUTO_SWINGUP;
+            event = "button_auto_swingup";
+        }
+    }
+
+#ifdef JOY_BTN_DEBUG
+    Serial.print("[BTN] n="); Serial.print(n);
+    for (uint16_t i = 0; i < n && i < 10; i++) {
+        Serial.print(" ["); Serial.print(i); Serial.print("]=0x");
+        Serial.print(r[i], HEX);
+    }
+    Serial.println();
+#endif
 }
 
 void packet_handler(uint8_t pkt_type, uint16_t /*ch*/, uint8_t* pkt, uint16_t /*sz*/) {
