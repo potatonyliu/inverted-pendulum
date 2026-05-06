@@ -38,11 +38,8 @@ bool csv_mode = false;
 
 void setup(){
     Serial.begin(115200);
-    delay(1500);
-    Serial.println("BOOTING...");
     hardware_setup();
     joystick_setup();
-    Serial.println("READY");
     t0 = micros();
     t1 = micros();
     last_print = micros();
@@ -108,8 +105,8 @@ void loop() {
         // placeholder — swap in friend's swing-up logic here
         coast_motor();
     }
-
-    if (micros() - last_print >= (csv_mode ? 10000 : 1000000)) {
+    
+    if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
         if (csv_mode) {
             // time_us, state, force, x, xdot, phi, phidot, event
             Serial.print(micros() - t0);   Serial.print(",");
@@ -121,13 +118,17 @@ void loop() {
             Serial.print(phidot, 4);        Serial.print(",");
             Serial.println(event);
         } else {
-            Serial.print("State:");         Serial.print(currentState);
-            Serial.print(" phi:");          Serial.print(phi, 2);
-            Serial.print(" x:");            Serial.print(x, 3);
-            Serial.print(" xdot:");         Serial.print(xdot, 2);
-            Serial.print(" F:");            Serial.print(force_out, 1);
-            Serial.print(" PWM:");          Serial.print(ENA);
-            Serial.print(" Evt:");          Serial.println(event[0] ? event : "-");
+            Serial.print(micros()/1000);    Serial.println("ms");
+            Serial.print("State: ");        Serial.println(currentState);
+            Serial.print("Force: ");        Serial.println(force_out);
+            Serial.print("x: ");            Serial.println(x);
+            Serial.print("xdot: ");         Serial.println(xdot);
+            Serial.print("phi: ");          Serial.println(phi);
+            Serial.print("phidot: ");       Serial.println(phidot);
+            Serial.print("Cart Ticks: ");       Serial.println(cart_ticks);
+            Serial.print("PWM: ");       Serial.println(ENA);
+            if (event[0]) { Serial.print("Event: "); Serial.println(event); }
+            Serial.println("=======================================");
         }
         event = "";
         last_print = micros();
