@@ -1,0 +1,175 @@
+#include <math.h>
+
+#define _PI 3.14159265f
+
+
+#define PA_PIN      3
+#define PB_PIN      4
+#define IN1_PIN     6
+#define IN2_PIN     7
+#define ENA_PIN     5
+#define LIMIT_L_PIN 10
+#define LIMIT_R_PIN 11
+
+
+#define E_REF       0.4905f
+#define ROD_MASS    0.05f
+#define ROD_COM     0.50f
+#define ROD_INERTIA 0.01667f
+
+
+#define RADIANS_PER_TICK (2.0f * _PI / 2400.0f)
+
+volatile long pendulum_ticks = 0;
+bool running = false;
+
+void pendulum_A_handler() {
+    int A = digitalRead(PA_PIN);
+    int B = digitalRead(PB_PIN);
+    if (A == B) pendulum_ticks--;
+    else        pendulum_ticks++;
+}
+void pendulum_B_handler() {
+    int A = digitalRead(PA_PIN);
+    int B = digitalRead(PB_PIN);
+    if (A != B) pendulum_ticks--;
+    else        pendulum_ticks++;
+}
+
+void motor_forward() {
+    digitalWrite(IN1_PIN, HIGH);
+    digitalWrite(IN2_PIN, LOW);
+    digitalWrite(ENA_PIN, HIGH);
+}
+
+void motor_backward() {
+    digitalWrite(IN1_PIN, LOW);
+    digitalWrite(IN2_PIN, HIGH);
+    digitalWrite(ENA_PIN, HIGH);
+}
+
+void coast_motor() {
+    digitalWrite(IN1_PIN, LOW);
+    digitalWrite(IN2_PIN, LOW);
+    digitalWrite(ENA_PIN, LOW);
+}
+
+float pendulum_energy(float phi, float phidot) {
+    float E_kin = 0.5f * ROD_INERTIA * phidot * phidot;
+    float E_pot = ROD_MASS * 9.81f * ROD_COM * (cosf(phi) + 1.0f);
+    return E_kin + E_pot;
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(1000);
+
+    pinMode(IN1_PIN, OUTPUT);
+    pinMode(IN2_PIN, OUTPUT);
+    pinMode(ENA_PIN, OUTPUT);
+    coast_motor();
+
+    pinMode(LIMIT_L_PIN, INPUT_PULLUP);
+    pinMode(LIMIT_R_PIN, INPUT_PULLUP);
+
+    
+    attachInterrupt(digitalPinToInterrupt(PA_PIN), pendulum_A_handler, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(PB_PIN), pendulum_B_handler, CHANGE);
+    pinMode(PA_PIN, INPUT_PULLUP);
+    pinMode(PB_PIN, INPUT_PULLUP);
+
+    pendulum_ticks = 0;
+    running = true;
+    Serial.println("Auto-starting swing-up...");
+}
+
+void loop() {
+    if (Serial.available()) {
+        char c = Serial.read();
+        if (c == 'w') { running = true;  Serial.println("RUNNING"); }
+        if (c == 's') { coast_motor();   running = false; Serial.println("STOPPED"); }
+    }
+
+    static unsigned long t1 = 0;
+    if (micros() - t1 < 1000) return;
+    t1 = micros();
+
+    noInterrupts();
+    long p_ticks = pendulum_ticks;
+    interrupts();
+
+    float phi_raw = p_ticks * RADIANS_PER_TICK;
+
+    
+    float phi = phi_raw - _PI;
+    if (phi >  _PI) phi -= 2.0f * _PI;
+    if (phi < -_PI) phi += 2.0f * _PI;
+
+    
+    static float phi_prev      = 0.0f;
+    static float phidot        = 0.0f;
+    static unsigned long t_vel = 0;
+    if (millis() - t_vel >= 50) {
+        float new_phidot = (phi - phi_prev) / 0.1f;
+        phidot   = 0.7f * phidot + 0.3f * new_phidot;
+        phidot   = constrain(phidot, -15.0f, 15.0f);
+        phi_prev = phi;
+        t_vel    = millis();
+    }
+
+    if (!running) return;
+
+    
+    if (!digitalRead(LIMIT_L_PIN) || !digitalRead(LIMIT_R_PIN)) {
+        coast_motor(); running = false;
+        Serial.println("LIMIT"); return;
+    }
+
+    
+    if (millis() > 3000 && fabsf(phi) < 0.087f) {
+        coast_motor(); running = false;
+        Serial.println("UPRIGHT"); return;
+    }
+
+    
+    static bool startup_done        = false;
+    static unsigned long rock_timer = 0;
+    static bool rock_dir            = true;
+    if (!startup_done) {
+        if (millis() - rock_timer > 1000) {
+            rock_dir   = !rock_dir;
+            rock_timer = millis();
+        }
+        if (rock_dir) motor_forward();
+        else          motor_backward();
+
+        if (fabsf(phidot) > 0.5f) {
+            startup_done = true;
+            Serial.println("Startup done — swing-up active");
+        }
+        Serial.print("rocking  phi="); Serial.print(phi * 180.0f / _PI, 1);
+        Serial.print("  phidot=");     Serial.println(phidot, 3);
+        return;
+    }
+
+    
+    if (fabsf(phidot) < 0.05f) {
+        
+        static bool kick_dir = true;
+        static unsigned long kick_timer = 0;
+        if (millis() - kick_timer > 1500) {
+            kick_dir = !kick_dir;
+            kick_timer = millis();
+        }
+        if (kick_dir) motor_forward();
+        else          motor_backward();
+    } else if (phidot > 0) {
+        motor_forward();
+    } else {
+        motor_backward();
+    }
+
+    Serial.print("phi=");     Serial.print(phi * 180.0f / _PI, 1);
+Serial.print(" phidot="); Serial.print(phidot, 3);
+Serial.println();
+}

@@ -4,7 +4,6 @@
 
 unsigned long t0;
 unsigned long t1;
-unsigned long t2;
 unsigned long t3;
 unsigned long last_print;
 float force_out;
@@ -15,8 +14,6 @@ float phidot;
 float xddot;
 float magXddot;
 float phiddot;
-float prev_x = 0.0;
-float prev_phi = 0.0;
 float prev_xdot = 0.0;
 float prev_phidot = 0.0;
 
@@ -29,7 +26,6 @@ void setup(){
     hardware_setup();
     ENA = 255;
     t3 = micros();
-    t2 = micros();
     t1 = micros();
     t0 = micros();
     last_print = micros();
@@ -58,17 +54,12 @@ void loop() {
         t3 = micros();
     }
 
-    if (micros()-t2 >= 10000){
-        xdot = (x-prev_x)/0.01;
-        phidot = (phi-prev_phi)/0.01;
-        prev_x = x;
-        prev_phi = phi;
-        t2 = micros();
-    }
     // 1ms control loop
     if (micros()-t1 >= 1000){
         x = read_position();
         phi = read_angle();
+        xdot = read_cart_velocity();
+        phidot = read_pendulum_velocity();
         state[0] = x;
         state[1] = xdot;
         state[2] = phi;

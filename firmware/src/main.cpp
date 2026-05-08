@@ -1,9 +1,7 @@
 #include "hardware.h"
 #include "control.h"
 #include "states.h"
-#include <sys/_intsup.h>
 
-unsigned long t2;
 unsigned long t1;
 unsigned long t0;
 unsigned long last_print;
@@ -12,8 +10,25 @@ float x = 0;
 float phi = 0;
 float xdot;
 float phidot;
-float prev_x = 0.0;
-float prev_phi = 0.0;
+
+// EMA
+float prev_xdot = 0.0;
+float prev_phidot = 0.0;
+float alpha = 1;
+float beta = 1;
+
+// --- Alpha-Beta tracker state ---
+float x_hat = 0.0f;
+float xdot_hat = 0.0f;
+float phi_hat = 0.0f;
+float phidot_hat = 0.0f;
+
+// --- Tracker gains ---
+const float DT         = 1e-3f;
+const float ALPHA_X    = 0.2f;   // position correction gain, cart
+const float BETA_X     = 0.05f;  // velocity correction gain, cart
+const float ALPHA_PHI  = 0.2f;   // position correction gain, pendulum
+const float BETA_PHI   = 0.05f;  // velocity correction gain, pendulum
 
 bool csv_mode = true;
 
@@ -22,22 +37,32 @@ void setup(){
     hardware_setup();
     t0 = micros();
     t1 = micros();
-    t2 = micros();
     last_print = micros();
 }
 
 void loop() {
 
-    if (micros()-t2 >= 10000){
-        xdot = (x-prev_x)/0.01;
-        phidot = (phi-prev_phi)/0.01;
-        prev_x = x;
-        prev_phi = phi;
-        t2 = micros();
-    }
     if (micros()-t1 >= 1000){
         x = read_position();
         phi = read_angle();
+        xdot = read_cart_velocity();
+        xdot = alpha * xdot + (1-alpha) * prev_xdot;
+         prev_xdot = xdot;
+        phidot = read_pendulum_velocity();
+        phidot = beta * phidot + (1-beta) * prev_phidot;
+        prev_phidot = phidot;
+
+        // TRACKING LOOP
+        // x_hat    += xdot_hat * DT;      // predict
+        // float e_x = x - x_hat;          // residual (meters)
+        // x_hat    += ALPHA_X * e_x;
+        // xdot_hat += (BETA_X / DT) * e_x;
+
+        // phi_hat    += phidot_hat * DT;  // predict
+        // float e_phi = phi - phi_hat;    // residual (radians)
+        // phi_hat    += ALPHA_PHI * e_phi;
+        // phidot_hat += (BETA_PHI / DT) * e_phi;
+
         state[0] = x;
         state[1] = xdot;
         state[2] = phi;
