@@ -6,6 +6,9 @@ extern void joystick_setup();
 extern void joystick_tick(float xdot);
 extern bool joystick_connected();
 
+extern void swingup_enter();
+extern void swingup_tick(float phi, float phidot);
+
 unsigned long t1;
 unsigned long t0;
 unsigned long last_print;
@@ -79,12 +82,14 @@ void loop() {
             if (c == 's' && currentState == RUNNING) { currentState = IDLE; event = "manual_stop"; }
             if (c == 'j' && currentState == IDLE) { currentState = JOYSTICK; event = "joystick_on"; }
             else if (c == 'j' && currentState == JOYSTICK) { currentState = IDLE; event = "joystick_off"; }
+            if (c == 'u' && currentState == IDLE) { currentState = SWINGUP; event = "swingup_on"; swingup_enter(); }
+            else if (c == 'u' && currentState == SWINGUP) { currentState = IDLE; event = "swingup_off"; }
         }
         t1 = micros();
     }
 
     // Auto-balance: hand off to LQR when pendulum is swung near upright.
-    if ((currentState == JOYSTICK) && fabsf(phi) < 0.2f) {
+    if ((currentState == JOYSTICK || currentState == SWINGUP) && fabsf(phi) < 0.2f) {
         currentState = RUNNING;
         event = "auto_balance";
         t0 = micros();
@@ -95,12 +100,16 @@ void loop() {
         if (phi > PI/2.0 or phi < -PI/2.0) {
             currentState = IDLE;
             event = "crash (angle)";
+            coast_motor();
+        } else {
+            update_motor(force_out, state[1]);
         }
-        update_motor(force_out, state[1]);
     } else if (currentState == IDLE) {
         coast_motor();
     } else if (currentState == JOYSTICK) {
         joystick_tick(state[1]);
+    } else if (currentState == SWINGUP) {
+        swingup_tick(state[2], state[3]);
     }
 
     if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
