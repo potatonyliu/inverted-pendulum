@@ -72,6 +72,33 @@ void loop() {
         state[1] = xdot;
         state[2] = phi;
         state[3] = phidot;
+
+        // L1 nudge in B-mode: stick → cart velocity setpoint, integrated
+        // into x_ref so the cart holds wherever you parked it on release.
+        // Only meaningful while LQR is RUNNING.
+        {
+            static unsigned long last_nudge_us = 0;
+            constexpr float MAX_NUDGE_VEL = 0.3f;  // m/s at full stick
+            bool nudge_active = (currentMode == MODE_BALANCE_ASSIST
+                                 && currentState == RUNNING
+                                 && joystick_button_held(JOY_BTN_L1));
+            if (nudge_active) {
+                unsigned long now = micros();
+                if (last_nudge_us != 0) {
+                    float dt   = (now - last_nudge_us) * 1e-6f;
+                    float stick = joystick_lx_normalised();   // -1..+1
+                    lqr_xdot_ref = stick * MAX_NUDGE_VEL;
+                    lqr_x_ref   += lqr_xdot_ref * dt;
+                }
+                last_nudge_us = now;
+            } else {
+                last_nudge_us = 0;
+                lqr_xdot_ref  = 0.0f;
+                // x_ref persists between L1 holds so the cart holds the
+                // last commanded position. It's reset on entry to RUNNING.
+            }
+        }
+
         force_out = compute_control();
         if (Serial.available()) {
             char c = Serial.read();
@@ -116,6 +143,10 @@ void loop() {
         currentState = RUNNING;
         event = "auto_balance";
         t0 = micros();
+        // Fresh balance run starts targeting x=0, regardless of any prior
+        // L1 nudges that may have pushed the reference around.
+        lqr_x_ref    = 0.0f;
+        lqr_xdot_ref = 0.0f;
     }
 
     // State machine
