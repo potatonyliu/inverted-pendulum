@@ -116,23 +116,28 @@ void loop() {
         if (joystick_consume_press(JOY_BTN_A)) {
             currentMode = MODE_AUTO; currentState = SWINGUP;
             event = "mode_auto"; swingup_enter();
+            joystick_rumble_pulse(80, 60);
         }
         if (joystick_consume_press(JOY_BTN_B)) {
             currentMode = MODE_BALANCE_ASSIST; currentState = JOYSTICK;
             event = "mode_balance_assist";
+            joystick_rumble_pulse(80, 60);
         }
         if (joystick_consume_press(JOY_BTN_Y)) {
             currentMode = MODE_JOYSTICK; currentState = JOYSTICK;
             event = "mode_joystick";
+            joystick_rumble_pulse(80, 60);
         }
         if (joystick_consume_press(JOY_BTN_X)) {
             currentMode = MODE_IDLE; currentState = IDLE;
             event = "mode_idle"; coast_motor();
+            joystick_rumble_pulse(80, 60);
         }
         if (joystick_button_held(JOY_BTN_L1) && joystick_button_held(JOY_BTN_R1)
                 && currentState != IDLE) {
             currentMode = MODE_IDLE; currentState = IDLE;
             event = "estop"; coast_motor();
+            joystick_rumble_pulse(200, 200);
         }
 
         // Home button: zero encoders + reset everything to a power-cycle-
@@ -157,6 +162,7 @@ void loop() {
                 lqr_xdot_ref = 0.0f;
                 event = "home_reset";
                 coast_motor();
+                joystick_rumble_pulse(120, 80);
             }
         }
 
@@ -182,6 +188,7 @@ void loop() {
             // mode, everything else (incl. serial 'w' and MODE_JOYSTICK)
             // falls back to IDLE.
             coast_motor();
+            joystick_rumble_pulse(200, 150);
             if (currentMode == MODE_AUTO) {
                 currentState = SWINGUP;
                 event = "crash → swingup";
@@ -211,6 +218,42 @@ void loop() {
     } else if (currentState == SWINGUP) {
         swingup_tick(state[0], state[1], state[2], state[3]);
     }
+
+    // ---- Ambient haptics ---------------------------------------------------
+    // Continuous rumble proportional to |force_out| while the LQR is RUNNING.
+    // 5 N floor avoids constant low-level buzz when the LQR is mostly quiet.
+    if (currentState == RUNNING) {
+        float f = fabsf(force_out);
+        if (f < 5.0f) {
+            joystick_rumble_continuous(0);
+        } else {
+            int level = (int)((f - 5.0f) * 10.0f);
+            if (level > 80) level = 80;
+            joystick_rumble_continuous((uint8_t)level);
+        }
+    } else {
+        joystick_rumble_continuous(0);
+    }
+
+    // "Just outside catch" pulses: when the pendulum is approaching upright
+    // but LQR hasn't engaged, pulse faster as |phi| → 0 to give the user a
+    // tactile "you're close" cue. Only fires when state is JOYSTICK/SWINGUP.
+    {
+        static unsigned long last_proximity_ms = 0;
+        bool close = (currentState == JOYSTICK || currentState == SWINGUP)
+                     && fabsf(phi) > 0.2f && fabsf(phi) < 0.4f;
+        if (close) {
+            unsigned long period = 100 + (unsigned long)(fabsf(phi) * 800);
+            if (millis() - last_proximity_ms > period) {
+                joystick_rumble_pulse(40, 30);
+                last_proximity_ms = millis();
+            }
+        } else {
+            last_proximity_ms = 0;
+        }
+    }
+
+    joystick_rumble_tick();
 
     if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
         if (csv_mode) {

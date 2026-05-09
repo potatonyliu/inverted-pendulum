@@ -24,6 +24,7 @@ float joystick_lx_normalised() { return 0.0f; }
 bool joystick_drive_motor_direct() { return false; }
 void joystick_rumble_pulse(uint8_t, uint16_t) {}
 void joystick_rumble_continuous(uint8_t) {}
+void joystick_rumble_tick() {}
 
 #else
 
@@ -258,6 +259,61 @@ void packet_handler(uint8_t pkt_type, uint16_t /*ch*/, uint8_t* pkt, uint16_t /*
 
 }  // anonymous namespace
 
+// ---- Rumble engine ----------------------------------------------------------
+// Internal state for the rumble engine. Pulses (one-shot, override) and a
+// continuous baseline level are tracked separately; joystick_rumble_tick()
+// resolves them into a single intensity and pushes a SET_REPORT to the
+// controller, rate-limited and refreshed periodically (some controllers
+// stop rumbling without periodic refresh reports).
+namespace {
+uint8_t  g_rumble_continuous   = 0;
+uint32_t g_rumble_pulse_end_ms = 0;
+uint8_t  g_rumble_pulse_strong = 0;
+uint8_t  g_last_rumble_sent    = 0;
+uint32_t g_last_rumble_send_ms = 0;
+
+// FORMAT IS UNVERIFIED for 8BitDo Pro 2 mode D — this is a best-guess
+// based on common gamepad layouts (8-byte output report, big motor at
+// index 2). If rumble doesn't trigger, alternatives to try:
+//   - report_id 0x01 instead of 0x05
+//   - swap indices 2/3 (some controllers use [weak, strong])
+//   - drop or change report_id (some need 0)
+void send_rumble_raw(uint8_t strong) {
+    if (!g_pad.connected || g_hid_cid == 0) return;
+    uint8_t report[8] = {0x00, 0x00, strong, 0x00, 0x00, 0x00, 0x00, 0x00};
+    hid_host_send_set_report(g_hid_cid, HID_REPORT_TYPE_OUTPUT, 0x05,
+                             report, sizeof(report));
+}
+}  // anonymous namespace
+
+void joystick_rumble_pulse(uint8_t strong, uint16_t duration_ms) {
+    g_rumble_pulse_strong = strong;
+    g_rumble_pulse_end_ms = millis() + duration_ms;
+}
+
+void joystick_rumble_continuous(uint8_t strong) {
+    g_rumble_continuous = strong;
+}
+
+void joystick_rumble_tick() {
+    if (!g_pad.connected) {
+        g_last_rumble_sent = 0;
+        return;
+    }
+    uint32_t now = millis();
+    uint8_t target = (now < g_rumble_pulse_end_ms) ? g_rumble_pulse_strong
+                                                   : g_rumble_continuous;
+    bool changed     = (target != g_last_rumble_sent);
+    bool refresh_due = (target > 0) && (now - g_last_rumble_send_ms > 200);
+    if (changed || refresh_due) {
+        send_rumble_raw(target);
+        g_last_rumble_sent    = target;
+        g_last_rumble_send_ms = now;
+    }
+}
+
+// ---- Setup / connection -----------------------------------------------------
+
 void joystick_setup() {
     Serial.println("[JOY] joystick_setup()");
 
@@ -340,9 +396,5 @@ float joystick_lx_normalised() {
     if (norm < -1.0f) norm = -1.0f;
     return norm;
 }
-
-// Rumble — stubs. Wired up to BTstack output reports in commit 9.
-void joystick_rumble_pulse(uint8_t /*strong*/, uint16_t /*duration_ms*/)  {}
-void joystick_rumble_continuous(uint8_t /*strong*/)                       {}
 
 #endif  // PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH

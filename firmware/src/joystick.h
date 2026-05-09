@@ -34,9 +34,9 @@ float joystick_lx_normalised();
 // motor is coasted) so the caller can fall back to its default behaviour.
 bool joystick_drive_motor_direct();
 
-// Rumble — stubs in this commit, output reports wired up in commit 9.
-// pulse:      strong-motor intensity 0-255, duration in ms; non-blocking.
-// continuous: sets a continuous strong-motor level; call again to update,
-//             or with 0 to stop. Pulses override continuous while active.
+// Rumble. pulse: one-shot, non-blocking; overrides continuous while active.
+// continuous: ambient level updated whenever you call it (0 = off).
+// rumble_tick: drives the actual BT output reports — call once per loop tick.
 void joystick_rumble_pulse(uint8_t strong, uint16_t duration_ms);
 void joystick_rumble_continuous(uint8_t strong);
+void joystick_rumble_tick();
