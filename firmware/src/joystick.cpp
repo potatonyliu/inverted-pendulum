@@ -264,6 +264,22 @@ void joystick_setup() {
     // services BTstack from its own async_context.
 }
 
+bool joystick_drive_motor_direct() {
+    if (!g_pad.connected) return false;
+    if (millis() - g_pad.last_report_ms > INACTIVE_TIMEOUT_MS) {
+        coast_motor();
+        return false;
+    }
+    int pwm = lx_to_pwm();
+    if (pwm == 0) {
+        coast_motor();
+    } else {
+        ENA = pwm;
+        update_motor_directly();
+    }
+    return true;
+}
+
 void joystick_tick(float /*xdot*/) {
     if (!g_pad.connected) {
         if (currentState == JOYSTICK) {
@@ -273,21 +289,8 @@ void joystick_tick(float /*xdot*/) {
         }
         return;
     }
-
     if (currentState != JOYSTICK) return;
-
-    if (millis() - g_pad.last_report_ms > INACTIVE_TIMEOUT_MS) {
-        coast_motor();
-        return;
-    }
-
-    int pwm = lx_to_pwm();
-    if (pwm == 0) {
-        coast_motor();
-        return;
-    }
-    ENA = pwm;
-    update_motor_directly();
+    joystick_drive_motor_direct();
 }
 
 bool joystick_connected() {

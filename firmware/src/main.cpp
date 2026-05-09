@@ -168,6 +168,14 @@ void loop() {
                 currentState = IDLE;
                 event = "crash (angle)";
             }
+        } else if (currentMode == MODE_BALANCE_ASSIST && joystick_button_held(JOY_BTN_R1)) {
+            // R1 hard override: skip LQR entirely, drive cart from stick.
+            // If BT drops mid-override, joystick_drive_motor_direct returns
+            // false and we fall back to LQR (cart will probably crash, but
+            // that's better than a stuck motor command).
+            if (!joystick_drive_motor_direct()) {
+                update_motor(force_out, state[1]);
+            }
         } else {
             update_motor(force_out, state[1]);
         }

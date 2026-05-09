@@ -29,6 +29,11 @@ bool joystick_consume_press(uint8_t btn);
 // flipped to match the cart-direction convention (positive = cart right).
 float joystick_lx_normalised();
 
+// Drive the motor straight from LX, bypassing the LQR. Returns false if
+// BT is disconnected or the latest report is stale (in which case the
+// motor is coasted) so the caller can fall back to its default behaviour.
+bool joystick_drive_motor_direct();
+
 // Rumble — stubs in this commit, output reports wired up in commit 9.
 // pulse:      strong-motor intensity 0-255, duration in ms; non-blocking.
 // continuous: sets a continuous strong-motor level; call again to update,
