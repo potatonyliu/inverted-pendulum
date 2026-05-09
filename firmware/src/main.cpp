@@ -82,6 +82,32 @@ void loop() {
             if (c == 'u' && currentState == IDLE) { currentState = SWINGUP; event = "swingup_on"; swingup_enter(); }
             else if (c == 'u' && currentState == SWINGUP) { currentState = IDLE; event = "swingup_off"; }
         }
+
+        // Controller-driven mode/state transitions. ABYX is edge-triggered
+        // (one shot per press). L1+R1 simultaneous = e-stop, fires once on
+        // the transition into IDLE so it doesn't churn while held.
+        if (joystick_consume_press(JOY_BTN_A)) {
+            currentMode = MODE_AUTO; currentState = SWINGUP;
+            event = "mode_auto"; swingup_enter();
+        }
+        if (joystick_consume_press(JOY_BTN_B)) {
+            currentMode = MODE_BALANCE_ASSIST; currentState = JOYSTICK;
+            event = "mode_balance_assist";
+        }
+        if (joystick_consume_press(JOY_BTN_Y)) {
+            currentMode = MODE_JOYSTICK; currentState = JOYSTICK;
+            event = "mode_joystick";
+        }
+        if (joystick_consume_press(JOY_BTN_X)) {
+            currentMode = MODE_IDLE; currentState = IDLE;
+            event = "mode_idle"; coast_motor();
+        }
+        if (joystick_button_held(JOY_BTN_L1) && joystick_button_held(JOY_BTN_R1)
+                && currentState != IDLE) {
+            currentMode = MODE_IDLE; currentState = IDLE;
+            event = "estop"; coast_motor();
+        }
+
         t1 = micros();
     }
 
@@ -95,9 +121,22 @@ void loop() {
     // State machine
     if (currentState == RUNNING) {
         if (phi > PI/2.0 or phi < -PI/2.0) {
-            currentState = IDLE;
-            event = "crash (angle)";
+            // Mode-aware crash recovery: AUTO retries the swing-up cycle,
+            // BALANCE_ASSIST drops back to manual joystick within the same
+            // mode, everything else (incl. serial 'w' and MODE_JOYSTICK)
+            // falls back to IDLE.
             coast_motor();
+            if (currentMode == MODE_AUTO) {
+                currentState = SWINGUP;
+                event = "crash → swingup";
+                swingup_enter();
+            } else if (currentMode == MODE_BALANCE_ASSIST) {
+                currentState = JOYSTICK;
+                event = "crash → joystick";
+            } else {
+                currentState = IDLE;
+                event = "crash (angle)";
+            }
         } else {
             update_motor(force_out, state[1]);
         }
