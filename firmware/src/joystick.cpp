@@ -89,12 +89,20 @@ void handle_report(const uint8_t* r, uint16_t n) {
         }
         // Compute press edges (0 → 1 on each button bit) into pressed_edge.
         // OR-accumulates; consumers clear by calling joystick_consume_press.
+        // Critical section: pressed_edge is read-modify-written from the
+        // main loop and ORed here from a BTstack async callback.
+        uint16_t edges_now = 0;
         for (uint8_t b = 0; b < JOY_BTN_COUNT; b++) {
             const ButtonInfo& info = BUTTON_TABLE[b];
             if (info.byte_idx < 5 || info.byte_idx > 7) continue;
             uint8_t cur  = g_pad.btn_bytes     [info.byte_idx - 5] & info.bit_mask;
             uint8_t prev = g_pad.btn_bytes_prev[info.byte_idx - 5] & info.bit_mask;
-            if (cur && !prev) g_pad.pressed_edge |= (uint16_t)(1u << b);
+            if (cur && !prev) edges_now |= (uint16_t)(1u << b);
+        }
+        if (edges_now) {
+            noInterrupts();
+            g_pad.pressed_edge |= edges_now;
+            interrupts();
         }
         // Debug print on any change to r[5..7] so bit positions can be
         // verified on the bench. Drops itself once button mapping is solid.
@@ -360,11 +368,12 @@ bool joystick_button_held(uint8_t btn) {
 bool joystick_consume_press(uint8_t btn) {
     if (btn >= JOY_BTN_COUNT) return false;
     uint16_t mask = (uint16_t)(1u << btn);
-    if (g_pad.pressed_edge & mask) {
-        g_pad.pressed_edge &= ~mask;
-        return true;
-    }
-    return false;
+    bool was_set;
+    noInterrupts();
+    was_set = (g_pad.pressed_edge & mask) != 0;
+    if (was_set) g_pad.pressed_edge &= ~mask;
+    interrupts();
+    return was_set;
 }
 
 float joystick_lx_normalised() {

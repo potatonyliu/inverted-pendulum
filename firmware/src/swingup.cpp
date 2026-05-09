@@ -13,20 +13,23 @@
 #include "states.h"
 
 namespace {
-constexpr float CENTER_THRESHOLD_M = 0.05f;  // 5 cm
-constexpr int   CENTER_PWM         = 150;    // bang-bang centering drive
+constexpr float         CENTER_THRESHOLD_M  = 0.05f;  // 5 cm
+constexpr int           CENTER_PWM          = 150;    // bang-bang centering drive
+constexpr unsigned long CENTER_TIMEOUT_MS   = 3000;   // give up if cart can't reach centre
 
-bool          centered     = false;
-bool          startup_done = false;
-unsigned long rock_t0      = 0;
-unsigned long kick_t0      = 0;
-bool          rock_dir     = true;
-bool          kick_dir     = true;
+bool          centered      = false;
+bool          startup_done  = false;
+unsigned long center_t0     = 0;
+unsigned long rock_t0       = 0;
+unsigned long kick_t0       = 0;
+bool          rock_dir      = true;
+bool          kick_dir      = true;
 }
 
 void swingup_enter() {
     centered     = false;
     startup_done = false;
+    center_t0    = millis();
     rock_t0      = millis();
     kick_t0      = millis();
     rock_dir     = true;
@@ -39,10 +42,17 @@ void swingup_tick(float x, float /*xdot*/, float phi, float phidot) {
 
     // Phase 1: centering. Sticky once done — we don't re-engage if the cart
     // drifts during pumping, because that would fight the energy buildup.
+    // Times out to IDLE if the cart can't reach the centre (stuck, jammed,
+    // or motor disconnected) — otherwise CENTER_PWM would drive forever.
     if (!centered) {
         if (fabsf(x) < CENTER_THRESHOLD_M) {
             centered = true;
             event = "swingup_centered";
+        } else if (millis() - center_t0 > CENTER_TIMEOUT_MS) {
+            currentState = IDLE;
+            event = "swingup_center_timeout";
+            coast_motor();
+            return;
         } else {
             ENA = (x > 0) ? -CENTER_PWM : CENTER_PWM;
             update_motor_directly();

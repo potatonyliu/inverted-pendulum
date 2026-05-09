@@ -75,10 +75,14 @@ void loop() {
 
         // L1 nudge in B-mode: stick → cart velocity setpoint, integrated
         // into x_ref so the cart holds wherever you parked it on release.
-        // Only meaningful while LQR is RUNNING.
+        // Only meaningful while LQR is RUNNING. x_ref is clamped to the
+        // physical rail extent so a held stick can't accumulate a phantom
+        // reference far past the cart's reach (which would otherwise cause
+        // a violent recovery when L1 is released).
         {
             static unsigned long last_nudge_us = 0;
-            constexpr float MAX_NUDGE_VEL = 0.3f;  // m/s at full stick
+            constexpr float MAX_NUDGE_VEL    = 0.3f;  // m/s at full stick
+            constexpr float MAX_NUDGE_OFFSET = 0.3f;  // ±m, ~rail half-length
             bool nudge_active = (currentMode == MODE_BALANCE_ASSIST
                                  && currentState == RUNNING
                                  && joystick_button_held(JOY_BTN_L1));
@@ -89,6 +93,8 @@ void loop() {
                     float stick = joystick_lx_normalised();   // -1..+1
                     lqr_xdot_ref = stick * MAX_NUDGE_VEL;
                     lqr_x_ref   += lqr_xdot_ref * dt;
+                    if (lqr_x_ref >  MAX_NUDGE_OFFSET) lqr_x_ref =  MAX_NUDGE_OFFSET;
+                    if (lqr_x_ref < -MAX_NUDGE_OFFSET) lqr_x_ref = -MAX_NUDGE_OFFSET;
                 }
                 last_nudge_us = now;
             } else {
