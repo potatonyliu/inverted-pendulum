@@ -135,6 +135,31 @@ void loop() {
             event = "estop"; coast_motor();
         }
 
+        // Home button: zero encoders + reset everything to a power-cycle-
+        // equivalent state. Refused silently unless the rig is physically
+        // at rest with the pendulum hanging — guards against zeroing
+        // mid-balance or mid-swing.
+        if (joystick_consume_press(JOY_BTN_HOME)) {
+            bool hanging = fabsf(fabsf(phi) - (float)PI) < 0.05f;
+            bool still   = fabsf(xdot) < 0.01f && fabsf(phidot) < 0.05f;
+            if (hanging && still) {
+                noInterrupts();
+                cart_ticks            = 0;
+                pendulum_ticks        = 0;
+                cart_tick_vel         = 0.0f;
+                pendulum_tick_vel     = 0.0f;
+                cart_last_tick_us     = micros();
+                pendulum_last_tick_us = micros();
+                interrupts();
+                currentMode  = MODE_IDLE;
+                currentState = IDLE;
+                lqr_x_ref    = 0.0f;
+                lqr_xdot_ref = 0.0f;
+                event = "home_reset";
+                coast_motor();
+            }
+        }
+
         t1 = micros();
     }
 
