@@ -2,11 +2,30 @@
 // Active only when currentState == JOYSTICK; left-stick X drives PWM via
 // update_motor_directly(), bypassing the LQR motor model. Button state and
 // rumble output are exposed via joystick.h for use by main.cpp.
+//
+// On non-Pico-W builds (pico_main env) this file compiles to no-op stubs
+// so main.cpp's joystick API calls still link. The actual BT path is gated
+// by PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH, which arduino-pico's build
+// script defines when liblwip-bt is selected.
 
 #include <Arduino.h>
 #include "hardware.h"
 #include "states.h"
 #include "joystick.h"
+
+#ifndef PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH
+
+void joystick_setup() {}
+void joystick_tick(float) {}
+bool joystick_connected() { return false; }
+bool joystick_button_held(uint8_t) { return false; }
+bool joystick_consume_press(uint8_t) { return false; }
+float joystick_lx_normalised() { return 0.0f; }
+bool joystick_drive_motor_direct() { return false; }
+void joystick_rumble_pulse(uint8_t, uint16_t) {}
+void joystick_rumble_continuous(uint8_t) {}
+
+#else
 
 extern "C" {
 #include "btstack.h"
@@ -325,3 +344,5 @@ float joystick_lx_normalised() {
 // Rumble — stubs. Wired up to BTstack output reports in commit 9.
 void joystick_rumble_pulse(uint8_t /*strong*/, uint16_t /*duration_ms*/)  {}
 void joystick_rumble_continuous(uint8_t /*strong*/)                       {}
+
+#endif  // PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH

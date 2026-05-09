@@ -4,7 +4,7 @@
 #include "joystick.h"
 
 extern void swingup_enter();
-extern void swingup_tick(float phi, float phidot);
+extern void swingup_tick(float x, float xdot, float phi, float phidot);
 
 unsigned long t1;
 unsigned long t0;
@@ -184,7 +184,7 @@ void loop() {
     } else if (currentState == JOYSTICK) {
         joystick_tick(state[1]);
     } else if (currentState == SWINGUP) {
-        swingup_tick(state[2], state[3]);
+        swingup_tick(state[0], state[1], state[2], state[3]);
     }
 
     if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
