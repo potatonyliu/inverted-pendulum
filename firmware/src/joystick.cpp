@@ -1,32 +1,13 @@
 // 8BitDo Pro 2 over Bluetooth Classic HID → manual cart jog + buttons.
 // Active only when currentState == JOYSTICK; left-stick X drives PWM via
 // update_motor_directly(), bypassing the LQR motor model. Button state and
-// rumble output are exposed via joystick.h for use by main.cpp.
-//
-// On non-Pico-W builds (pico_main env) this file compiles to no-op stubs
-// so main.cpp's joystick API calls still link. The actual BT path is gated
-// by PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH, which arduino-pico's build
-// script defines when liblwip-bt is selected.
+// rumble output are exposed via joystick.h for use by main.cpp. Requires
+// the Pico W build (BT-enabled arduino-pico core).
 
 #include <Arduino.h>
 #include "hardware.h"
 #include "states.h"
 #include "joystick.h"
-
-#ifndef PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH
-
-void joystick_setup() {}
-void joystick_tick(float) {}
-bool joystick_connected() { return false; }
-bool joystick_button_held(uint8_t) { return false; }
-bool joystick_consume_press(uint8_t) { return false; }
-float joystick_lx_normalised() { return 0.0f; }
-bool joystick_drive_motor_direct() { return false; }
-void joystick_rumble_pulse(uint8_t, uint16_t) {}
-void joystick_rumble_continuous(uint8_t) {}
-void joystick_rumble_tick() {}
-
-#else
 
 extern "C" {
 #include "btstack.h"
@@ -397,4 +378,3 @@ float joystick_lx_normalised() {
     return norm;
 }
 
-#endif  // PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH
