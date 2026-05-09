@@ -1,10 +1,12 @@
-// 8BitDo Pro 2 over Bluetooth Classic HID → manual cart jog.
+// 8BitDo Pro 2 over Bluetooth Classic HID → manual cart jog + buttons.
 // Active only when currentState == JOYSTICK; left-stick X drives PWM via
-// update_motor_directly(), bypassing the LQR motor model.
+// update_motor_directly(), bypassing the LQR motor model. Button state and
+// rumble output are exposed via joystick.h for use by main.cpp.
 
 #include <Arduino.h>
 #include "hardware.h"
 #include "states.h"
+#include "joystick.h"
 
 extern "C" {
 #include "btstack.h"
@@ -20,10 +22,31 @@ static constexpr uint8_t  INQUIRY_DURATION    = 3;
 
 namespace {
 
+// Per the 8BitDo Pro 2 mode D layout (axes empirically verified, button
+// bytes still needing verification): r[1]=LX, r[2]=LY, r[3]=RX, r[4]=RY,
+// r[5]=face/shoulder buttons, r[6]=Select/Start/Home/L3/R3, r[7]=hat/dpad.
+// The bit table below is a best guess — the [JOY-BTN] debug print emits
+// any change in r[5..7] so positions can be confirmed on the bench.
+struct ButtonInfo { uint8_t byte_idx; uint8_t bit_mask; };
+constexpr ButtonInfo BUTTON_TABLE[JOY_BTN_COUNT] = {
+    /* JOY_BTN_A      */ {5, 0x01},
+    /* JOY_BTN_B      */ {5, 0x02},
+    /* JOY_BTN_X      */ {5, 0x08},
+    /* JOY_BTN_Y      */ {5, 0x10},
+    /* JOY_BTN_L1     */ {5, 0x40},
+    /* JOY_BTN_R1     */ {5, 0x80},
+    /* JOY_BTN_SELECT */ {6, 0x04},
+    /* JOY_BTN_START  */ {6, 0x08},
+    /* JOY_BTN_HOME   */ {6, 0x10},
+};
+
 struct PadState {
     uint8_t  lx = AXIS_CENTRE;
-    uint32_t last_report_ms = 0;
-    bool     connected = false;
+    uint8_t  btn_bytes[3]      = {0, 0, 0}; // raw r[5], r[6], r[7]
+    uint8_t  btn_bytes_prev[3] = {0, 0, 0}; // for [JOY-BTN] change detection
+    uint16_t pressed_edge      = 0;          // bit i set on rising edge for button i
+    uint32_t last_report_ms    = 0;
+    bool     connected         = false;
 };
 PadState g_pad;
 
@@ -46,11 +69,45 @@ int lx_to_pwm() {
     return pwm;
 }
 
-// 8BitDo Pro 2 mode D: after stripping the 0xA1 HID-input prefix, axis
-// bytes are LX=r[1], LY=r[2], RX=r[3], RY=r[4]. Only LX is used.
+bool button_held_internal(uint8_t btn) {
+    if (btn >= JOY_BTN_COUNT) return false;
+    const ButtonInfo& b = BUTTON_TABLE[btn];
+    if (b.byte_idx < 5 || b.byte_idx > 7) return false;
+    return (g_pad.btn_bytes[b.byte_idx - 5] & b.bit_mask) != 0;
+}
+
 void handle_report(const uint8_t* r, uint16_t n) {
     if (n < 2) return;
     g_pad.lx = r[1];
+
+    // Buttons live at r[5..7]; gate so we don't read garbage on short reports.
+    if (n >= 8) {
+        for (int i = 0; i < 3; i++) {
+            g_pad.btn_bytes_prev[i] = g_pad.btn_bytes[i];
+            g_pad.btn_bytes[i]      = r[5 + i];
+        }
+        // Compute press edges (0 → 1 on each button bit) into pressed_edge.
+        // OR-accumulates; consumers clear by calling joystick_consume_press.
+        for (uint8_t b = 0; b < JOY_BTN_COUNT; b++) {
+            const ButtonInfo& info = BUTTON_TABLE[b];
+            if (info.byte_idx < 5 || info.byte_idx > 7) continue;
+            uint8_t cur  = g_pad.btn_bytes     [info.byte_idx - 5] & info.bit_mask;
+            uint8_t prev = g_pad.btn_bytes_prev[info.byte_idx - 5] & info.bit_mask;
+            if (cur && !prev) g_pad.pressed_edge |= (uint16_t)(1u << b);
+        }
+        // Debug print on any change to r[5..7] so bit positions can be
+        // verified on the bench. Drops itself once button mapping is solid.
+        bool changed = false;
+        for (int i = 0; i < 3; i++) {
+            if (g_pad.btn_bytes[i] != g_pad.btn_bytes_prev[i]) { changed = true; break; }
+        }
+        if (changed) {
+            Serial.print("[JOY-BTN] r5=0x"); Serial.print(g_pad.btn_bytes[0], HEX);
+            Serial.print(" r6=0x");          Serial.print(g_pad.btn_bytes[1], HEX);
+            Serial.print(" r7=0x");          Serial.println(g_pad.btn_bytes[2], HEX);
+        }
+    }
+
     g_pad.last_report_ms = millis();
 }
 
@@ -145,17 +202,23 @@ void packet_handler(uint8_t pkt_type, uint16_t /*ch*/, uint8_t* pkt, uint16_t /*
                     g_hid_cid            = hid_subevent_connection_opened_get_hid_cid(pkt);
                     g_pad.connected      = true;
                     g_pad.lx             = AXIS_CENTRE;
+                    memset(g_pad.btn_bytes,      0, sizeof(g_pad.btn_bytes));
+                    memset(g_pad.btn_bytes_prev, 0, sizeof(g_pad.btn_bytes_prev));
+                    g_pad.pressed_edge   = 0;
                     g_pad.last_report_ms = millis();
                     Serial.println("[JOY] controller CONNECTED");
                     break;
                 }
                 case HID_SUBEVENT_CONNECTION_CLOSED:
                     Serial.println("[JOY] controller DISCONNECTED, rescanning");
-                    g_hid_cid       = 0;
-                    g_connecting    = false;
-                    g_gamepad_seen  = false;
-                    g_pad.connected = false;
-                    g_pad.lx        = AXIS_CENTRE;
+                    g_hid_cid          = 0;
+                    g_connecting       = false;
+                    g_gamepad_seen     = false;
+                    g_pad.connected    = false;
+                    g_pad.lx           = AXIS_CENTRE;
+                    memset(g_pad.btn_bytes,      0, sizeof(g_pad.btn_bytes));
+                    memset(g_pad.btn_bytes_prev, 0, sizeof(g_pad.btn_bytes_prev));
+                    g_pad.pressed_edge = 0;
                     gap_inquiry_start(INQUIRY_DURATION);
                     break;
                 case HID_SUBEVENT_REPORT: {
@@ -230,3 +293,32 @@ void joystick_tick(float /*xdot*/) {
 bool joystick_connected() {
     return g_pad.connected;
 }
+
+bool joystick_button_held(uint8_t btn) {
+    return button_held_internal(btn);
+}
+
+bool joystick_consume_press(uint8_t btn) {
+    if (btn >= JOY_BTN_COUNT) return false;
+    uint16_t mask = (uint16_t)(1u << btn);
+    if (g_pad.pressed_edge & mask) {
+        g_pad.pressed_edge &= ~mask;
+        return true;
+    }
+    return false;
+}
+
+float joystick_lx_normalised() {
+    int d = AXIS_CENTRE - (int)g_pad.lx;
+    if (d > -AXIS_DEADZONE && d < AXIS_DEADZONE) return 0.0f;
+    if (d > 0) d -= AXIS_DEADZONE;
+    else       d += AXIS_DEADZONE;
+    float norm = (float)d / (127.0f - (float)AXIS_DEADZONE);
+    if (norm >  1.0f) norm =  1.0f;
+    if (norm < -1.0f) norm = -1.0f;
+    return norm;
+}
+
+// Rumble — stubs. Wired up to BTstack output reports in commit 9.
+void joystick_rumble_pulse(uint8_t /*strong*/, uint16_t /*duration_ms*/)  {}
+void joystick_rumble_continuous(uint8_t /*strong*/)                       {}

@@ -1,10 +1,7 @@
 #include "hardware.h"
 #include "control.h"
 #include "states.h"
-
-extern void joystick_setup();
-extern void joystick_tick(float xdot);
-extern bool joystick_connected();
+#include "joystick.h"
 
 extern void swingup_enter();
 extern void swingup_tick(float phi, float phidot);
