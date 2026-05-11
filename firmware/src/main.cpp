@@ -4,7 +4,7 @@
 #include "joystick.h"
 
 extern void swingup_enter();
-extern void swingup_tick(float x, float xdot, float phi, float phidot);
+extern void swingup_tick();
 
 unsigned long t1;
 unsigned long t0;
@@ -34,7 +34,7 @@ const float BETA_X     = 0.05f;  // velocity correction gain, cart
 const float ALPHA_PHI  = 0.2f;   // position correction gain, pendulum
 const float BETA_PHI   = 0.05f;  // velocity correction gain, pendulum
 
-bool csv_mode = false;
+bool csv_mode = true;
 
 void setup(){
     Serial.begin(115200);
@@ -222,7 +222,7 @@ void loop() {
     } else if (currentState == JOYSTICK) {
         joystick_tick(state[1]);
     } else if (currentState == SWINGUP) {
-        swingup_tick(state[0], state[1], state[2], state[3]);
+        swingup_tick();
     }
 
     // ---- Ambient haptics ---------------------------------------------------

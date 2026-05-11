@@ -1,73 +1,65 @@
-// Energy-pumping swing-up. Three phases:
-//   1. Centering: drive cart to x≈0 so subsequent rocking has rail margin
-//      on both sides. Critical for AUTO-mode loop, where the cart can be
-//      anywhere after a crash.
-//   2. Rocking: alternate ±255 every 1 s until pendulum has any swing.
-//   3. Pumping: bang-bang in the direction of phidot. Periodic kick if the
-//      pendulum stalls.
-// Active only when currentState == SWINGUP. Hand-off to LQR happens in
-// main.cpp when |phi| < 0.2.
+// Energy-pumping swing-up. Algorithm is the same as the standalone
+// `firmware/swingup` file from the swing-up branch. Motor drive goes
+// through update_motor_directly() (analogWrite-based PWM) instead of
+// raw digitalWrite on ENA — the original could use digitalWrite because
+// its coast_motor() also used digitalWrite, so ENA_PIN stayed in SIO
+// mode. Main's coast_motor() uses analogWrite(0), which leaves the pin
+// in PWM hardware-function, and mixing digitalWrite calls on top of
+// that produces asymmetric drive. Active only when currentState ==
+// SWINGUP. Hand-off to LQR happens in main.cpp when |phi| < 0.2.
 
 #include <Arduino.h>
 #include "hardware.h"
 #include "states.h"
 
-namespace {
-constexpr float         CENTER_THRESHOLD_M  = 0.05f;  // 5 cm
-constexpr int           CENTER_PWM          = 150;    // bang-bang centering drive
-constexpr unsigned long CENTER_TIMEOUT_MS   = 3000;   // give up if cart can't reach centre
+static void motor_forward() {
+    ENA = 255;
+    update_motor_directly();
+}
 
-bool          centered      = false;
-bool          startup_done  = false;
-unsigned long center_t0     = 0;
-unsigned long rock_t0       = 0;
-unsigned long kick_t0       = 0;
-bool          rock_dir      = true;
-bool          kick_dir      = true;
+static void motor_backward() {
+    ENA = -255;
+    update_motor_directly();
 }
 
 void swingup_enter() {
-    centered     = false;
-    startup_done = false;
-    center_t0    = millis();
-    rock_t0      = millis();
-    kick_t0      = millis();
-    rock_dir     = true;
-    kick_dir     = true;
+    // No-op: statics inside swingup_tick persist exactly like the
+    // original program-statics.
 }
 
-void swingup_tick(float x, float /*xdot*/, float phi, float phidot) {
-    (void)phi;
+void swingup_tick() {
     if (currentState != SWINGUP) return;
 
-    // Phase 1: centering. Sticky once done — we don't re-engage if the cart
-    // drifts during pumping, because that would fight the energy buildup.
-    // Times out to IDLE if the cart can't reach the centre (stuck, jammed,
-    // or motor disconnected) — otherwise CENTER_PWM would drive forever.
-    if (!centered) {
-        if (fabsf(x) < CENTER_THRESHOLD_M) {
-            centered = true;
-            event = "swingup_centered";
-        } else if (millis() - center_t0 > CENTER_TIMEOUT_MS) {
-            currentState = IDLE;
-            event = "swingup_center_timeout";
-            coast_motor();
-            return;
-        } else {
-            ENA = (x > 0) ? -CENTER_PWM : CENTER_PWM;
-            update_motor_directly();
-            return;
-        }
+    noInterrupts();
+    long p_ticks = pendulum_ticks;
+    interrupts();
+
+    float phi_raw = p_ticks * RADIANS_PER_TICK;
+    float phi = phi_raw - PI;
+    if (phi >  PI) phi -= 2.0f * PI;
+    if (phi < -PI) phi += 2.0f * PI;
+
+    static float         phi_prev = 0.0f;
+    static float         phidot   = 0.0f;
+    static unsigned long t_vel    = 0;
+    if (millis() - t_vel >= 50) {
+        float new_phidot = (phi - phi_prev) / 0.1f;
+        phidot   = 0.7f * phidot + 0.3f * new_phidot;
+        phidot   = constrain(phidot, -15.0f, 15.0f);
+        phi_prev = phi;
+        t_vel    = millis();
     }
 
-    // Phase 2: initial rocking, until pendulum has any measurable swing.
+    static bool          startup_done = false;
+    static unsigned long rock_timer   = 0;
+    static bool          rock_dir     = true;
     if (!startup_done) {
-        if (millis() - rock_t0 > 1000) {
-            rock_dir = !rock_dir;
-            rock_t0 = millis();
+        if (millis() - rock_timer > 1000) {
+            rock_dir   = !rock_dir;
+            rock_timer = millis();
         }
-        ENA = rock_dir ? 255 : -255;
-        update_motor_directly();
+        if (rock_dir) motor_forward();
+        else          motor_backward();
         if (fabsf(phidot) > 0.5f) {
             startup_done = true;
             event = "swingup_started";
@@ -75,16 +67,18 @@ void swingup_tick(float x, float /*xdot*/, float phi, float phidot) {
         return;
     }
 
-    // Phase 3: energy pumping — push in direction of motion. Periodic kick
-    // to revive a stalled pendulum.
     if (fabsf(phidot) < 0.05f) {
-        if (millis() - kick_t0 > 1500) {
-            kick_dir = !kick_dir;
-            kick_t0 = millis();
+        static bool          kick_dir   = true;
+        static unsigned long kick_timer = 0;
+        if (millis() - kick_timer > 1500) {
+            kick_dir   = !kick_dir;
+            kick_timer = millis();
         }
-        ENA = kick_dir ? 255 : -255;
+        if (kick_dir) motor_forward();
+        else          motor_backward();
+    } else if (phidot > 0) {
+        motor_forward();
     } else {
-        ENA = phidot > 0 ? 255 : -255;
+        motor_backward();
     }
-    update_motor_directly();
 }
