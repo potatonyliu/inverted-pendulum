@@ -23,22 +23,23 @@ static constexpr uint8_t  INQUIRY_DURATION    = 3;
 
 namespace {
 
-// Per the 8BitDo Pro 2 mode D layout (axes empirically verified, button
-// bytes still needing verification): r[1]=LX, r[2]=LY, r[3]=RX, r[4]=RY,
+// Per the 8BitDo Pro 2 mode D layout: r[1]=LX, r[2]=LY, r[3]=RX, r[4]=RY,
 // r[5]=face/shoulder buttons, r[6]=Select/Start/Home/L3/R3, r[7]=hat/dpad.
-// The bit table below is a best guess — the [JOY-BTN] debug print emits
-// any change in r[5..7] so positions can be confirmed on the bench.
+// Verified masks (commit 02d727c, bench): A=0x40, X=0x80, Y=0x10. Other
+// buttons were not bench-verified anywhere in history — disabled here
+// with the {0,0} sentinel until confirmed via the [JOY-BTN] debug print.
+// {0,0} is treated as "never matches" by button_held_internal.
 struct ButtonInfo { uint8_t byte_idx; uint8_t bit_mask; };
 constexpr ButtonInfo BUTTON_TABLE[JOY_BTN_COUNT] = {
-    /* JOY_BTN_A      */ {5, 0x01},
-    /* JOY_BTN_B      */ {5, 0x02},
-    /* JOY_BTN_X      */ {5, 0x08},
-    /* JOY_BTN_Y      */ {5, 0x10},
-    /* JOY_BTN_L1     */ {5, 0x40},
-    /* JOY_BTN_R1     */ {5, 0x80},
-    /* JOY_BTN_SELECT */ {6, 0x04},
-    /* JOY_BTN_START  */ {6, 0x08},
-    /* JOY_BTN_HOME   */ {6, 0x10},
+    /* JOY_BTN_A      */ {5, 0x40},  // verified
+    /* JOY_BTN_B      */ {0, 0   },  // unverified — disabled
+    /* JOY_BTN_X      */ {5, 0x80},  // verified
+    /* JOY_BTN_Y      */ {5, 0x10},  // verified
+    /* JOY_BTN_L1     */ {0, 0   },  // unverified — disabled (old 0x40 collided with A)
+    /* JOY_BTN_R1     */ {0, 0   },  // unverified — disabled (old 0x80 collided with X)
+    /* JOY_BTN_SELECT */ {0, 0   },  // unverified — disabled
+    /* JOY_BTN_START  */ {0, 0   },  // unverified — disabled
+    /* JOY_BTN_HOME   */ {0, 0   },  // unverified — disabled
 };
 
 struct PadState {
