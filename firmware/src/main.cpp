@@ -4,16 +4,24 @@
 #include "joystick.h"
 
 extern void swingup_enter();
-extern void swingup_tick();
+extern void swingup_tick(float swingup_phi, float swingup_phidot, float new_max_speed = 150);
+extern void recenter_tick(float current_x);
 
 unsigned long t1;
 unsigned long t0;
+unsigned long time_since_balancing_began;
+unsigned long time_since_intentional_fall_began;
 unsigned long last_print;
 float force_out;
 float x = 0;
 float phi = 0;
+float new_phi = 0.0;
 float xdot;
-float phidot;
+float new_phidot = 0.0;
+float phidot = 0.0;
+int direction = 0;
+int prev_direction = 0;
+float new_max_speed = 150;
 
 // EMA
 float prev_xdot = 0.0;
@@ -36,24 +44,58 @@ const float BETA_PHI   = 0.05f;  // velocity correction gain, pendulum
 
 bool csv_mode = true;
 
-void setup(){
+// --- debugging state ---
+enum class DebugState {
+    NORMAL, 
+    QUIET, 
+    SWINGUP_DEBUG
+};
+
+DebugState currentDebugState = DebugState::SWINGUP_DEBUG;
+
+void setup() {
     Serial.begin(115200);
     hardware_setup();
     joystick_setup();
     t0 = micros();
     t1 = micros();
+    time_since_balancing_began = micros();
+    last_print = micros();
+
+    phi = new_phi = read_angle();
+}
+
+void reset() {
+    hardware_setup();
+    joystick_setup();
+    t0 = micros();
+    t1 = micros();
+    time_since_balancing_began = micros();
     last_print = micros();
 }
 
 void loop() {
 
-    if (micros()-t1 >= 1000){
+    if (micros()-t1 >= 1000) {
         x = read_position();
         phi = read_angle();
+        // new_phi = read_angle();
+        // if (fabsf(phi - new_phi) > 1.5) { //reject outliers. no update cycle should show a huge increase in phi - new_phi
+        //     new_phi = phi; //by skipping them
+        // }
+        // phi = ((phi * 1) + new_phi) / 2; //smooth angle noise over multiple readings
+
         xdot = read_cart_velocity();
         xdot = alpha * xdot + (1-alpha) * prev_xdot;
-         prev_xdot = xdot;
-        phidot = read_pendulum_velocity();
+        prev_xdot = xdot;
+
+        new_phidot = read_pendulum_velocity();
+        if (fabsf(prev_phidot - new_phidot) > 1.5) { //reject outliers. no update cycle should show a huge increase in phidot - new_phidot
+            new_phidot = prev_phidot; //by skipping them
+        }
+        phidot = ((phidot * 7) + new_phidot) / 8; //smooth velocity noise over multiple readings
+        // Serial.print("read_pendulum_velocity() = ");
+        //Serial.println(phidot, 6);
         phidot = beta * phidot + (1-beta) * prev_phidot;
         prev_phidot = phidot;
 
@@ -79,72 +121,79 @@ void loop() {
         // physical rail extent so a held stick can't accumulate a phantom
         // reference far past the cart's reach (which would otherwise cause
         // a violent recovery when L1 is released).
-        {
-            static unsigned long last_nudge_us = 0;
-            constexpr float MAX_NUDGE_VEL    = 0.3f;  // m/s at full stick
-            constexpr float MAX_NUDGE_OFFSET = 0.3f;  // ±m, ~rail half-length
-            bool nudge_active = (currentMode == MODE_BALANCE_ASSIST
-                                 && currentState == RUNNING
-                                 && joystick_button_held(JOY_BTN_L1));
-            if (nudge_active) {
-                unsigned long now = micros();
-                if (last_nudge_us != 0) {
-                    float dt   = (now - last_nudge_us) * 1e-6f;
-                    float stick = joystick_lx_normalised();   // -1..+1
-                    lqr_xdot_ref = stick * MAX_NUDGE_VEL;
-                    lqr_x_ref   += lqr_xdot_ref * dt;
-                    if (lqr_x_ref >  MAX_NUDGE_OFFSET) lqr_x_ref =  MAX_NUDGE_OFFSET;
-                    if (lqr_x_ref < -MAX_NUDGE_OFFSET) lqr_x_ref = -MAX_NUDGE_OFFSET;
-                }
-                last_nudge_us = now;
-            } else {
-                last_nudge_us = 0;
-                lqr_xdot_ref  = 0.0f;
-                // x_ref persists between L1 holds so the cart holds the
-                // last commanded position. It's reset on entry to RUNNING.
-            }
-        }
+        // {
+        //     static unsigned long last_nudge_us = 0;
+        //     constexpr float MAX_NUDGE_VEL    = 0.3f;  // m/s at full stick
+        //     constexpr float MAX_NUDGE_OFFSET = 0.3f;  // ±m, ~rail half-length
+        //     bool nudge_active = (currentMode == MODE_BALANCE_ASSIST
+        //                          && currentState == RUNNING
+        //                          && joystick_button_held(JOY_BTN_L1));
+        //     if (nudge_active) {
+        //         unsigned long now = micros();
+        //         if (last_nudge_us != 0) {
+        //             float dt   = (now - last_nudge_us) * 1e-6f;
+        //             float stick = joystick_lx_normalised();   // -1..+1
+        //             lqr_xdot_ref = stick * MAX_NUDGE_VEL;
+        //             lqr_x_ref   += lqr_xdot_ref * dt;
+        //             if (lqr_x_ref >  MAX_NUDGE_OFFSET) lqr_x_ref =  MAX_NUDGE_OFFSET;
+        //             if (lqr_x_ref < -MAX_NUDGE_OFFSET) lqr_x_ref = -MAX_NUDGE_OFFSET;
+        //         }
+        //         last_nudge_us = now;
+        //     } else {
+        //         last_nudge_us = 0;
+        //         lqr_xdot_ref  = 0.0f;
+        //         // x_ref persists between L1 holds so the cart holds the
+        //         // last commanded position. It's reset on entry to RUNNING.
+        //     }
+        // }
 
         force_out = compute_control();
         if (Serial.available()) {
             char c = Serial.read();
-            if (c == 'w' && currentState == IDLE) { currentState = RUNNING; event = "start"; t0 = micros();}
-            if (c == 's' && currentState == RUNNING) { currentState = IDLE; event = "manual_stop"; }
-            if (c == 'j' && currentState == IDLE) { currentState = JOYSTICK; event = "joystick_on"; }
-            else if (c == 'j' && currentState == JOYSTICK) { currentState = IDLE; event = "joystick_off"; }
-            if (c == 'u' && currentState == IDLE) { currentState = SWINGUP; event = "swingup_on"; swingup_enter(); }
-            else if (c == 'u' && currentState == SWINGUP) { currentState = IDLE; event = "swingup_off"; }
+            if (c == 'a') { Serial.println("a - key presssed"); adjust_position(50); }
+            if (c == 'd') { Serial.println("d - key presssed"); adjust_position(-50); }
+            if (c == 'q') { Serial.print("new_max_speed: "); new_max_speed -= 5.0; Serial.println(new_max_speed); if (new_max_speed < 100){new_max_speed = 100;}}
+            if (c == 'e') { Serial.print("new_max_speed: "); new_max_speed += 5.0; Serial.println(new_max_speed); if (new_max_speed > 255){new_max_speed = 255;}}
+            if (c == 'w' && currentState == IDLE) { currentState = RUNNING; Serial.print("State: "); Serial.println(currentState); event = "start"; t0 = micros(); time_since_balancing_began = micros();}
+            if (c == 's' && currentState == RUNNING) { currentState = IDLE; Serial.print("State: "); Serial.println(currentState); event = "manual_stop"; }
+            if (c == 'j' && currentState == IDLE) { currentState = JOYSTICK; Serial.print("State: "); Serial.println(currentState); event = "joystick_on"; }
+            else if (c == 'j' && currentState == JOYSTICK) { currentState = IDLE; Serial.print("State: "); Serial.println(currentState); event = "joystick_off"; }
+            if (c == 'u' && (currentState == IDLE || currentState == RECENTER || currentState == RUNNING)) { currentState = SWINGUP; Serial.print("State: "); Serial.println(currentState); subState = INITIALIZING; event = "swingup_on"; swingup_enter(); }
+            else if (c == 'u' && currentState == SWINGUP) { currentState = IDLE; Serial.print("State: "); Serial.println(currentState); event = "swingup_off"; }
+            if (c == 'r' && currentState == IDLE) { currentState = RECENTER; Serial.print("State: "); Serial.println(currentState); event = "recenter_on"; }
+            else if (c == 'r' && currentState == RECENTER) { currentState = IDLE; Serial.print("State: "); Serial.println(currentState); event = "recenter_off"; }
         }
+        
 
         // Controller-driven mode/state transitions. ABYX is edge-triggered
         // (one shot per press). L1+R1 simultaneous = e-stop, fires once on
         // the transition into IDLE so it doesn't churn while held.
-        if (joystick_consume_press(JOY_BTN_A)) {
-            currentMode = MODE_AUTO; currentState = SWINGUP;
-            event = "mode_auto"; swingup_enter();
-            joystick_rumble_pulse(80, 60);
-        }
-        if (joystick_consume_press(JOY_BTN_B)) {
-            currentMode = MODE_BALANCE_ASSIST; currentState = JOYSTICK;
-            event = "mode_balance_assist";
-            joystick_rumble_pulse(80, 60);
-        }
-        if (joystick_consume_press(JOY_BTN_Y)) {
-            currentMode = MODE_JOYSTICK; currentState = JOYSTICK;
-            event = "mode_joystick";
-            joystick_rumble_pulse(80, 60);
-        }
-        if (joystick_consume_press(JOY_BTN_X)) {
-            currentMode = MODE_IDLE; currentState = IDLE;
-            event = "mode_idle"; coast_motor();
-            joystick_rumble_pulse(80, 60);
-        }
-        if (joystick_button_held(JOY_BTN_L1) && joystick_button_held(JOY_BTN_R1)
-                && currentState != IDLE) {
-            currentMode = MODE_IDLE; currentState = IDLE;
-            event = "estop"; coast_motor();
-            joystick_rumble_pulse(200, 200);
-        }
+        // if (joystick_consume_press(JOY_BTN_A)) {
+        //     currentMode = MODE_AUTO; currentState = SWINGUP;
+        //     event = "mode_auto"; swingup_enter();
+        //     joystick_rumble_pulse(80, 60);
+        // }
+        // if (joystick_consume_press(JOY_BTN_B)) {
+        //     currentMode = MODE_BALANCE_ASSIST; currentState = JOYSTICK;
+        //     event = "mode_balance_assist";
+        //     joystick_rumble_pulse(80, 60);
+        // }
+        // if (joystick_consume_press(JOY_BTN_Y)) {
+        //     currentMode = MODE_JOYSTICK; currentState = JOYSTICK;
+        //     event = "mode_joystick";
+        //     joystick_rumble_pulse(80, 60);
+        // }
+        // if (joystick_consume_press(JOY_BTN_X)) {
+        //     currentMode = MODE_IDLE; currentState = IDLE;
+        //     event = "mode_idle"; coast_motor();
+        //     joystick_rumble_pulse(80, 60);
+        // }
+        // if (joystick_button_held(JOY_BTN_L1) && joystick_button_held(JOY_BTN_R1)
+        //         && currentState != IDLE) {
+        //     currentMode = MODE_IDLE; currentState = IDLE;
+        //     event = "estop"; coast_motor();
+        //     joystick_rumble_pulse(200, 200);
+        // }
 
         // Home button: zero encoders + reset everything to a power-cycle-
         // equivalent state. Refused silently unless the rig is physically
@@ -164,6 +213,7 @@ void loop() {
                 interrupts();
                 currentMode  = MODE_IDLE;
                 currentState = IDLE;
+                Serial.print("State: "); Serial.println(currentState); 
                 lqr_x_ref    = 0.0f;
                 lqr_xdot_ref = 0.0f;
                 event = "home_reset";
@@ -178,8 +228,10 @@ void loop() {
     // Auto-balance: hand off to LQR when pendulum is swung near upright.
     if ((currentState == JOYSTICK || currentState == SWINGUP) && fabsf(phi) < 0.2f) {
         currentState = RUNNING;
+        Serial.print("State: "); Serial.println(currentState); 
         event = "auto_balance";
         t0 = micros();
+        time_since_balancing_began = micros();
         // Fresh balance run starts targeting x=0, regardless of any prior
         // L1 nudges that may have pushed the reference around.
         lqr_x_ref    = 0.0f;
@@ -188,6 +240,12 @@ void loop() {
 
     // State machine
     if (currentState == RUNNING) {
+        if ( (micros() - time_since_balancing_began) > 50000000000) {
+            currentState = INTENTIONAL_FALL;
+            Serial.print("State: "); Serial.println(currentState); 
+            Serial.print("INTENTIONAL FALL: ");            Serial.println(micros());
+            time_since_intentional_fall_began = micros();
+        }
         if (phi > PI/2.0 or phi < -PI/2.0) {
             // Mode-aware crash recovery: AUTO retries the swing-up cycle,
             // BALANCE_ASSIST drops back to manual joystick within the same
@@ -197,13 +255,20 @@ void loop() {
             joystick_rumble_pulse(200, 150);
             if (currentMode == MODE_AUTO) {
                 currentState = SWINGUP;
+                Serial.print("State: "); Serial.println(currentState); 
+                subState = LOW_SWING;
                 event = "crash → swingup";
                 swingup_enter();
             } else if (currentMode == MODE_BALANCE_ASSIST) {
                 currentState = JOYSTICK;
+                Serial.print("State: "); Serial.println(currentState); 
                 event = "crash → joystick";
             } else {
-                currentState = IDLE;
+                // currentState = IDLE;
+                currentState = SWINGUP;
+                subState = LOW_SWING;
+                swingup_enter();
+                Serial.print("State: "); Serial.println(currentState); 
                 event = "crash (angle)";
             }
         } else if (currentMode == MODE_BALANCE_ASSIST && joystick_button_held(JOY_BTN_R1)) {
@@ -222,7 +287,19 @@ void loop() {
     } else if (currentState == JOYSTICK) {
         joystick_tick(state[1]);
     } else if (currentState == SWINGUP) {
-        swingup_tick();
+        swingup_tick(phi, phidot, new_max_speed);
+    } else if (currentState == RECENTER) {
+        recenter_tick(x);
+    } else if (currentState == INTENTIONAL_FALL) {
+        currentState = RUNNING;
+        // recenter_tick(x);
+        // if ((micros() - time_since_intentional_fall_began) > 10000000) {
+        //     currentState = RUNNING;
+        //     Serial.print("State: "); Serial.println(currentState); 
+        //     currentMode = MODE_AUTO;
+        //     event = "autorestart → swingup";
+        //     swingup_enter();
+        // }
     }
 
     // ---- Ambient haptics ---------------------------------------------------
@@ -261,32 +338,38 @@ void loop() {
 
     joystick_rumble_tick();
 
-    if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
-        if (csv_mode) {
-            // time_us, state, force, x, xdot, phi, phidot, event
-            Serial.print(micros() - t0);   Serial.print(",");
-            Serial.print(currentState);     Serial.print(",");
-            Serial.print(force_out, 4);     Serial.print(",");
-            Serial.print(x, 4);             Serial.print(",");
-            Serial.print(xdot, 4);          Serial.print(",");
-            Serial.print(phi, 4);           Serial.print(",");
-            Serial.print(phidot, 4);        Serial.print(",");
-            Serial.println(event);
-        } else {
-            Serial.print(micros()/1000);    Serial.println("ms");
-            Serial.print("State: ");        Serial.println(currentState);
-            Serial.print("Force: ");        Serial.println(force_out);
-            Serial.print("x: ");            Serial.println(x);
-            Serial.print("xdot: ");         Serial.println(xdot);
-            Serial.print("phi: ");          Serial.println(phi);
-            Serial.print("phidot: ");       Serial.println(phidot);
-            Serial.print("Cart Ticks: ");       Serial.println(cart_ticks);
-            Serial.print("PWM: ");       Serial.println(ENA);
-            if (event[0]) { Serial.print("Event: "); Serial.println(event); }
-            Serial.println("=======================================");
+    if (currentDebugState == DebugState::SWINGUP_DEBUG) {
+        //Serial.print("x: ");            Serial.println(x);
+    }
+
+    if (currentDebugState == DebugState::NORMAL) {
+        if (micros() - last_print >= (csv_mode ? 10000 : 100000)) {
+            if (csv_mode) {
+                // time_us, state, force, x, xdot, phi, phidot, event
+                Serial.print(micros() - t0);   Serial.print(",");
+                Serial.print(currentState);     Serial.print(",");
+                Serial.print(force_out, 4);     Serial.print(",");
+                Serial.print(x, 4);             Serial.print(",");
+                Serial.print(xdot, 4);          Serial.print(",");
+                Serial.print(phi, 4);           Serial.print(",");
+                Serial.print(phidot, 4);        Serial.print(",");
+                Serial.println(event);
+            } else {
+                Serial.print(micros()/1000);    Serial.println("ms");
+                Serial.print("State: ");        Serial.println(currentState);
+                Serial.print("Force: ");        Serial.println(force_out);
+                Serial.print("x: ");            Serial.println(x);
+                Serial.print("xdot: ");         Serial.println(xdot);
+                Serial.print("phi: ");          Serial.println(phi);
+                Serial.print("phidot: ");       Serial.println(phidot);
+                Serial.print("Cart Ticks: ");       Serial.println(cart_ticks);
+                Serial.print("PWM: ");       Serial.println(ENA);
+                if (event[0]) { Serial.print("Event: "); Serial.println(event); }
+                Serial.println("=======================================");
+            }
+            event = "";
+            last_print = micros();
         }
-        event = "";
-        last_print = micros();
     }
 }
 // pio device monitor -b 115200 | tee "../logs/main_$(date +%Y%m%d_%H%M%S).csv"

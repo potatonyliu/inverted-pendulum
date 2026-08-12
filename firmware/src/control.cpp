@@ -1,6 +1,7 @@
 #include "control.h"
 
-float K[4] = {20.0, 50.0, 152.4200, 30.0335};
+// float K[4] = {20.0, 50.0, 152.4200, 30.0335};
+float K[4] = {10.0, 25.0, 40.0, 15.0};
 float state[4] = {0.0, 0.0, 0.0, 0.0};
 float lqr_x_ref    = 0.0f;
 float lqr_xdot_ref = 0.0f;
@@ -11,5 +12,9 @@ float compute_control(){
               -K[2] *  state[2]
               -K[3] *  state[3];
     // u = constrain(u, -MAX_FORCE, MAX_FORCE);
-    return u;
+
+    // //soften force when phi is near zero
+    // float current_phi = state[2];
+    
+    return u*1.0;
 }

@@ -35,8 +35,11 @@ float read_cart_velocity(unsigned long stale_us = 100000);
 float read_pendulum_velocity(unsigned long stale_us = 100000);
 
 float read_position();
+float adjust_position(float adjustment);
 float read_angle();
 void update_motor(float force, float xdot);
 void update_motor_directly();
+void motor_forward(int ena_amount = 180);
+void motor_backward(int ena_amount = 180);
 void coast_motor();
 void hardware_setup();
